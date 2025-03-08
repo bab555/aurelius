@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>天枢 AI - 智能未来</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+theme: {
+extend: {
+colors: {
+primary: '#6366f1',
+secondary: '#4f46e5'
+},
+borderRadius: {
+'none': '0px',
+'sm': '2px',
+DEFAULT: '4px',
+'md': '8px',
+'lg': '12px',
+'xl': '16px',
+'2xl': '20px',
+'3xl': '24px',
+'full': '9999px',
+'button': '4px'
+}
+}
+}
+}
+</script>
+<style>
+body {
+	min-height: 480px;
+	background-color: #04031e;
+	/*overflow: hidden;*/
+}
+.nav-item:hover {
+	background: rgba(255,255,255,0.08);
+}
+.nav-item-on{
+	background: rgba(255,255,255,0.08);
+}
+.tool-card {
+	background: rgba(255,255,255,0.06);
+	backdrop-filter: blur(10px);
+	transition: all 0.3s ease;
+}
+.tool-card:hover {
+	margin-top: -6px;
+	background: rgba(255,255,255,0.12);
+}
+.tool-card {
+	opacity: 0;
+	transform: translateY(20px);
+	animation: fadeInUp 0.6s ease forwards;
+	overflow: hidden;
+	background: rgba(255,255,255,0.06);
+	backdrop-filter: blur(10px);
+}
+.work-card {
+	opacity: 0;
+	transform: translateY(20px);
+	animation: fadeInUp 0.6s ease forwards;
+	overflow: hidden;
+	background: rgba(255,255,255,0.06);
+	backdrop-filter: blur(10px);
+}
+.work-card img {
+	transition: transform 0.3s ease;
+}
+.work-card:hover img {
+	transform: scale(1.1);
+}
+@keyframes fadeInUp {
+to {
+opacity: 1;
+transform: translateY(0);
+}
+}
+
+/* WebKit浏览器 */
+::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+::-webkit-scrollbar-track {
+    background: #222130;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #484850;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #5d5d67;
+}
+
+/* Firefox浏览器 */
+html {
+    scrollbar-width: thin;
+    scrollbar-color: #484850 #222130;
+}
+</style>
+</head>
+<body>
+<div class="flex min-h-screen"> 
+  <!-- 左侧导航 -->
+  <nav class="w-60 bg-[#04031e] fixed h-screen flex flex-col"> 
+    <!-- Logo -->
+    <div class="p-6">
+      <h1 class="text-white ml-1"><a href="/"><img src="img/logo.png"></a></h1>
+    </div>
+    <!-- 导航菜单 -->
+    <div class="flex-1 px-0">
+      <div class="space-y-2">
+		<a href="main.html" class="nav-item nav-item-on flex items-center text-gray-300 px-4 py-3 rounded-lg hover:text-white"> <i class="fas fa-home w-6 h-6 flex items-center justify-center"></i> <span class="ml-3">首页</span> </a>
+        
+        <!-- 天枢助手选项 -->
+        <a href="chat.html" class="nav-item flex items-center text-gray-300 px-4 py-3 rounded-lg hover:text-white">
+          <i class="fas fa-robot w-6 h-6 flex items-center justify-center"></i>
+          <span class="ml-3">天枢助手</span>
+        </a>
+        
+        <div class="space-y-2">
+          <div class="nav-item text-gray-300 px-4 py-3 rounded-lg hover:text-white cursor-pointer flex items-center"> <i class="fas fa-wand-magic-sparkles w-6 h-6 flex items-center justify-center"></i> <span class="ml-3">AI 工具</span> </div>
+          <div class="ml-8 space-y-2">
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="far fa-edit w-5 h-5 flex items-center justify-center mr-2"></i> <span>AI 方案助手</span></a>
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="far fa-commenting w-5 h-5 flex items-center justify-center mr-2"></i> <span>AI 文生图</span></a>
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="far fa-image w-5 h-5 flex items-center justify-center mr-2"></i> <span>AI 修图</span></a>
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="fas fa-film w-5 h-5 flex items-center justify-center mr-2"></i> <span>AI 视频</span></a>
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="far fa-file-powerpoint w-5 h-5 flex items-center justify-center mr-2"></i> <span>AI PPT 助手</span></a>
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="far fa-hdd w-5 h-5 flex items-center justify-center mr-2"></i> <span>AI 文字游戏</span></a> 
+		  </div>
+        </div>
+        <div class="space-y-2">
+          <div class="nav-item text-gray-300 px-4 py-3 rounded-lg hover:text-white cursor-pointer flex items-center"> <i class="fas fa-info-circle w-6 h-6 flex items-center justify-center"></i> <span class="ml-3">了解我们</span> </div>
+          <div class="ml-8 space-y-2">
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="far fa-circle-question w-5 h-5 flex items-center justify-center mr-2"></i> <span>关于我们</span></a>
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="far fa-paper-plane w-5 h-5 flex items-center justify-center mr-2"></i> <span>产品服务</span></a>
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="far fa-file-text w-5 h-5 flex items-center justify-center mr-2"></i> <span>解决方案</span></a>
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="far fa-envelope w-5 h-5 flex items-center justify-center mr-2"></i> <span>联系我们</span></a>
+		  </div>
+        </div>
+      </div>
+    </div>
+    <!-- 底部社交链接 -->
+    <div class="p-6 border-t border-gray-800">
+        <div class="flex space-x-4 justify-center mb-4">
+		  <a href="#" class="text-gray-400 hover:text-white"> <i class="fab fa-weixin w-6 h-6 flex items-center justify-center"></i> </a>
+		  <a href="#" class="text-gray-400 hover:text-white"> <i class="fab fa-weibo w-6 h-6 flex items-center justify-center"></i> </a>
+		  <a href="#" class="text-gray-400 hover:text-white"> <i class="fab fa-github w-6 h-6 flex items-center justify-center"></i> </a>
+		</div>
+        <div class="text-gray-500 text-center text-sm"> © <script type="text/javascript">var today = new Date();document.write(today.getFullYear());</script> 新红点智能科技 </div>
+    </div>
+  </nav>
+  <!-- 右侧主内容区 -->
+  <div class="ml-60 flex-1"> 
+    <!-- 顶部固定区 -->
+    <header class="h-[88px] bg-[#04031e] fixed right-0 left-64 z-10 flex items-center justify-end px-7">
+      <button class="rounded-[6px] px-8 h-[40px] bg-gradient-to-r from-primary to-secondary text-white font-medium hover:brightness-110 transition-all duration-300 whitespace-nowrap">登录</button>
+    </header>
+    <!-- 主要内容区 -->
+    <main class="pt-20 px-7"> 
+      <!-- AI工具展示区 -->
+      <section class="py-3">
+        <h2 class="text-2xl font-bold text-white mb-6">推荐 AI 工具</h2>
+        <div class="grid grid-cols-4 gap-6">
+          <div class="tool-card p-6 rounded-lg">
+			  <a href="#">
+			    <div class="flex items-center mb-4">
+				  <div class="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center"> <i class="fas fa-paintbrush text-primary text-xl"></i> </div>
+				  <h3 class="text-white text-xl font-semibold ml-4">AI 文生图</h3>
+			    </div>
+			    <p class="text-gray-400">强大的 AI 图像生成工具，让创意无限可能</p>
+			  </a>
+          </div>
+          <div class="tool-card p-6 rounded-lg">
+			  <a href="#">
+				<div class="flex items-center mb-4">
+				  <div class="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center"> <i class="fas fa-image text-primary text-xl"></i> </div>
+				  <h3 class="text-white text-xl font-semibold ml-4">AI 修图</h3>
+				</div>
+				<p class="text-gray-400">智能图像高清修复，一键修复你的照片</p>
+			  </a>
+          </div>
+          <div class="tool-card p-6 rounded-lg">
+              <a href="#">
+				<div class="flex items-center mb-4">
+				  <div class="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center"> <i class="fas fa-film text-primary text-xl"></i> </div>
+				  <h3 class="text-white text-xl font-semibold ml-4">AI 视频</h3>
+				</div>
+				<p class="text-gray-400">智能视频创作与编辑，让视频制作更简单</p>
+			  </a>
+          </div>
+          <div class="tool-card p-6 rounded-lg">
+			  <a href="#">
+				<div class="flex items-center mb-4">
+				  <div class="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center"> <i class="fas fa-file-powerpoint text-primary text-xl"></i> </div>
+				  <h3 class="text-white text-xl font-semibold ml-4">AI PPT 助手</h3>
+				</div>
+				<p class="text-gray-400">智能生成专业级演示文稿，提升工作效率</p>
+			  </a>
+          </div>
+        </div>
+      </section>
+      <!-- 用户作品展示区 -->
+      <section class="py-8">
+        <h2 class="text-2xl font-bold text-white mb-6">优秀作品展示</h2>
+        <div class="grid grid-cols-3 gap-6">
+		  <a href="#">
+			  <div class="work-card tool-card rounded-lg overflow-hidden"> <img src="https://ai-public.mastergo.com/ai/img_res/8d0ba1f2dfc8b64c3098003084e8c637.jpg"
+	class="w-full h-48 object-cover" alt="作品展示">
+				<div class="p-4">
+				  <h3 class="text-white font-semibold mb-2">未来城市幻想</h3>
+				  <div class="flex items-center justify-between"> <span class="text-gray-400 text-sm">by 张艺谋</span>
+					<div class="flex items-center space-x-2"> <i class="far fa-heart text-red-500"></i> <span class="text-gray-400 text-sm">2,345</span> </div>
+				  </div>
+				</div>
+			  </div>
+		  </a>
+		  <a href="#">
+			  <div class="work-card tool-card rounded-lg overflow-hidden"> <img src="https://ai-public.mastergo.com/ai/img_res/385d62cd1ffab3d9d9c76078a2becd3a.jpg"
+	class="w-full h-48 object-cover" alt="作品展示">
+				<div class="p-4">
+				  <h3 class="text-white font-semibold mb-2">梦幻森林</h3>
+				  <div class="flex items-center justify-between"> <span class="text-gray-400 text-sm">by 刘德华</span>
+					<div class="flex items-center space-x-2"> <i class="far fa-heart text-red-500"></i> <span class="text-gray-400 text-sm">1,892</span> </div>
+				  </div>
+				</div>
+			  </div>
+		  </a>
+		  <a href="#">
+			  <div class="work-card tool-card rounded-lg overflow-hidden"> <img src="https://ai-public.mastergo.com/ai/img_res/7b53bb3cfe416c2fa20eddef2e9255b3.jpg"
+	class="w-full h-48 object-cover" alt="作品展示">
+				<div class="p-4">
+				  <h3 class="text-white font-semibold mb-2">时尚光影</h3>
+				  <div class="flex items-center justify-between"> <span class="text-gray-400 text-sm">by 周杰伦</span>
+					<div class="flex items-center space-x-2"> <i class="far fa-heart text-red-500"></i> <span class="text-gray-400 text-sm">3,671</span> </div>
+				  </div>
+				</div>
+			  </div>
+		  </a>
+		  <a href="#">
+			  <div class="work-card tool-card rounded-lg overflow-hidden"> <img src="https://ai-public.mastergo.com/ai/img_res/ad5085eb971dddde43ed82f64653eae8.jpg"
+	class="w-full h-48 object-cover" alt="作品展示">
+				<div class="p-4">
+				  <h3 class="text-white font-semibold mb-2">太空探索</h3>
+				  <div class="flex items-center justify-between"> <span class="text-gray-400 text-sm">by 王力宏</span>
+					<div class="flex items-center space-x-2"> <i class="far fa-heart text-red-500"></i> <span class="text-gray-400 text-sm">2,103</span> </div>
+				  </div>
+				</div>
+			  </div>
+		  </a>
+		  <a href="#">
+			  <div class="work-card tool-card rounded-lg overflow-hidden"> <img src="https://ai-public.mastergo.com/ai/img_res/13512ef4e6df4f668031527e00fd24ea.jpg"
+	class="w-full h-48 object-cover" alt="作品展示">
+				<div class="p-4">
+				  <h3 class="text-white font-semibold mb-2">现代建筑</h3>
+				  <div class="flex items-center justify-between"> <span class="text-gray-400 text-sm">by 林俊杰</span>
+					<div class="flex items-center space-x-2"> <i class="far fa-heart text-red-500"></i> <span class="text-gray-400 text-sm">1,567</span> </div>
+				  </div>
+				</div>
+			  </div>
+		  </a>
+		  <a href="#">
+			  <div class="work-card tool-card rounded-lg overflow-hidden"> <img src="https://ai-public.mastergo.com/ai/img_res/56df7328efa4299c78bc5edda78abe32.jpg"
+	class="w-full h-48 object-cover" alt="作品展示">
+				<div class="p-4">
+				  <h3 class="text-white font-semibold mb-2">未来产品</h3>
+				  <div class="flex items-center justify-between"> <span class="text-gray-400 text-sm">by 陈奕迅</span>
+					<div class="flex items-center space-x-2"> <i class="far fa-heart text-red-500"></i> <span class="text-gray-400 text-sm">2,891</span> </div>
+				  </div>
+				</div>
+			  </div>
+		  </a>
+		  <a href="#">
+			  <div class="work-card tool-card rounded-lg overflow-hidden"> <img src="https://ai-public.mastergo.com/ai/img_res/035154ae1a72f549193d0983fed6c649.jpg"
+	class="w-full h-48 object-cover" alt="作品展示">
+				<div class="p-4">
+				  <h3 class="text-white font-semibold mb-2">海底世界</h3>
+				  <div class="flex items-center justify-between"> <span class="text-gray-400 text-sm">by 蔡依林</span>
+					<div class="flex items-center space-x-2"> <i class="far fa-heart text-red-500"></i> <span class="text-gray-400 text-sm">1,756</span> </div>
+				  </div>
+				</div>
+			  </div>
+		  </a>
+		  <a href="#">
+			  <div class="work-card tool-card rounded-lg overflow-hidden"> <img src="https://ai-public.mastergo.com/ai/img_res/e5ee0782d00227840644cef511656431.jpg"
+	class="w-full h-48 object-cover" alt="作品展示">
+				<div class="p-4">
+				  <h3 class="text-white font-semibold mb-2">抽象艺术</h3>
+				  <div class="flex items-center justify-between"> <span class="text-gray-400 text-sm">by 邓紫棋</span>
+					<div class="flex items-center space-x-2"> <i class="far fa-heart text-red-500"></i> <span class="text-gray-400 text-sm">2,234</span> </div>
+				  </div>
+				</div>
+			  </div>
+		  </a>
+		  <a href="#">
+			  <div class="work-card tool-card rounded-lg overflow-hidden"> <img src="https://ai-public.mastergo.com/ai/img_res/96203ece83be6d3e3605068f27844c53.jpg"
+	class="w-full h-48 object-cover" alt="作品展示">
+				<div class="p-4">
+				  <h3 class="text-white font-semibold mb-2">蒸汽朋克</h3>
+				  <div class="flex items-center justify-between"> <span class="text-gray-400 text-sm">by 五月天阿信</span>
+					<div class="flex items-center space-x-2"> <i class="far fa-heart text-red-500"></i> <span class="text-gray-400 text-sm">3,012</span> </div>
+				  </div>
+				</div>
+			  </div>
+		  </a>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</body>
+</html>

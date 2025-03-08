@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>天枢 AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+theme: {
+extend: {
+colors: {
+primary: '#6366f1',
+secondary: '#4f46e5'
+},
+borderRadius: {
+'none': '0px',
+'sm': '2px',
+DEFAULT: '4px',
+'md': '8px',
+'lg': '12px',
+'xl': '16px',
+'2xl': '20px',
+'3xl': '24px',
+'full': '9999px',
+'button': '4px'
+}
+}
+}
+}
+</script>
+<style>
+body {
+	min-height: 1024px;
+	background-color: #04031e;
+	overflow-y: hidden;
+}
+.nav-item:hover {
+	background: rgba(255,255,255,0.08);
+}
+.nav-item-on {
+	background: rgba(255,255,255,0.08);
+}
+.nav-item-on i, .nav-item-on span {
+	color: #829fff !important;
+}
+.tool-card {
+	background: rgba(255,255,255,0.06);
+	backdrop-filter: blur(10px);
+	transition: all 0.3s ease;
+}
+.tool-card:hover {
+	margin-top: -6px;
+	background: rgba(255,255,255,0.12);
+}
+.tool-card {
+	opacity: 0;
+	transform: translateY(20px);
+	animation: fadeInUp 0.6s ease forwards;
+	overflow: hidden;
+	background: rgba(255,255,255,0.06);
+	backdrop-filter: blur(10px);
+}
+.work-card {
+	opacity: 0;
+	transform: translateY(20px);
+	animation: fadeInUp 0.6s ease forwards;
+	overflow: hidden;
+	background: rgba(255,255,255,0.06);
+	backdrop-filter: blur(10px);
+}
+.work-card img {
+	transition: transform 0.3s ease;
+}
+.work-card:hover img {
+	transform: scale(1.1);
+}
+@keyframes fadeInUp {
+to {
+opacity: 1;
+transform: translateY(0);
+}
+}
+
+/* WebKit浏览器 */
+#chat-messages::-webkit-scrollbar {
+ width: 12px;
+ height: 12px;
+}
+
+#chat-messages::-webkit-scrollbar-track {
+ background: #222130;
+ border-radius: 10px;
+}
+
+#chat-messages::-webkit-scrollbar-thumb {
+ background: #484850;
+ border-radius: 10px;
+}
+
+#chat-messages::-webkit-scrollbar-thumb:hover {
+ background: #5d5d67;
+}
+/* Firefox浏览器 */
+#chat-messages html {
+	scrollbar-width: thin;
+	scrollbar-color: #484850 #222130;
+}
+</style>
+</head>
+<body>
+<div class="flex min-h-screen"> 
+  <!-- 左侧导航 -->
+  <nav class="w-60 bg-[#04031e] fixed h-screen flex flex-col"> 
+    <!-- Logo -->
+    <div class="p-6">
+      <h1 class="text-white ml-1"><a href="/"><img src="img/logo.png"></a></h1>
+    </div>
+    <!-- 导航菜单 -->
+    <div class="flex-1 px-0 ml-3">
+      <div class="space-y-2">
+		<a href="main.html" class="nav-item flex items-center text-gray-300 px-4 py-3 rounded-lg hover:text-white"> <i class="fas fa-home w-6 h-6 flex items-center justify-center"></i> <span class="ml-3">首页</span> </a>
+        <div class="space-y-2">
+          <div class="nav-item text-gray-300 px-4 py-3 rounded-lg hover:text-white cursor-pointer flex items-center"> <i class="fas fa-wand-magic-sparkles w-6 h-6 flex items-center justify-center"></i> <span class="ml-3">AI 工具</span> </div>
+          <div class="ml-8 space-y-2">
+			  <a href="chat.html" class="text-gray-400 hover:text-white block py-2 flex items-center nav-item-on"> <i class="far fa-edit w-5 h-5 flex items-center justify-center mr-2"></i> <span>AI 方案助手</span></a>
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="far fa-commenting w-5 h-5 flex items-center justify-center mr-2"></i> <span>AI 文生图</span></a>
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="far fa-image w-5 h-5 flex items-center justify-center mr-2"></i> <span>AI 修图</span></a>
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="fas fa-film w-5 h-5 flex items-center justify-center mr-2"></i> <span>AI 视频</span></a>
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="far fa-file-powerpoint w-5 h-5 flex items-center justify-center mr-2"></i> <span>AI PPT 助手</span></a>
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="far fa-hdd w-5 h-5 flex items-center justify-center mr-2"></i> <span>AI 文字游戏</span></a> 
+		  </div>
+        </div>
+        <div class="space-y-2">
+          <div class="nav-item text-gray-300 px-4 py-3 rounded-lg hover:text-white cursor-pointer flex items-center"> <i class="fas fa-info-circle w-6 h-6 flex items-center justify-center"></i> <span class="ml-3">了解我们</span> </div>
+          <div class="ml-8 space-y-2">
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="far fa-circle-question w-5 h-5 flex items-center justify-center mr-2"></i> <span>关于我们</span></a>
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="far fa-paper-plane w-5 h-5 flex items-center justify-center mr-2"></i> <span>产品服务</span></a>
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="far fa-file-text w-5 h-5 flex items-center justify-center mr-2"></i> <span>解决方案</span></a>
+			  <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center"> <i class="far fa-envelope w-5 h-5 flex items-center justify-center mr-2"></i> <span>联系我们</span></a>
+		  </div>
+        </div>
+      </div>
+    </div>
+    <!-- 底部社交链接 -->
+    <div class="p-6 border-t border-gray-800">
+      <div class="flex space-x-4 justify-center mb-4">
+		  <a href="#" class="text-gray-400 hover:text-white"> <i class="fab fa-weixin w-6 h-6 flex items-center justify-center"></i> </a>
+		  <a href="#" class="text-gray-400 hover:text-white"> <i class="fab fa-weibo w-6 h-6 flex items-center justify-center"></i> </a>
+		  <a href="#" class="text-gray-400 hover:text-white"> <i class="fab fa-github w-6 h-6 flex items-center justify-center"></i> </a> </div>
+      	  <div class="text-gray-500 text-center text-sm"> © <script type="text/javascript">var today = new Date();document.write(today.getFullYear());</script> 新红点智能科技 </div>
+    </div>
+  </nav>
+  <!-- 右侧主内容区 -->
+  <div class="ml-64 flex-1"> 
+    <!-- 顶部固定区 -->
+    <header class="h-20 bg-[#04031e] fixed right-0 left-64 z-10 flex items-center justify-end px-8">
+      <button class="rounded-[6px] px-8 h-[40px] bg-gradient-to-r from-primary to-secondary text-white font-medium hover:brightness-110 transition-all duration-300 whitespace-nowrap">登录</button>
+    </header>
+    <!-- 主要内容区 -->
+    <main class="pt-20 px-8 pb-32 flex flex-col h-[calc(100vh-80px)]">
+      <div class="flex-1 overflow-y-auto" id="chat-messages">
+        <div class="space-y-6 pr-4"> 
+          <!-- AI消息 -->
+          <div class="flex items-start">
+            <div class="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0"> <i class="fas fa-robot text-primary"></i> </div>
+            <div class="ml-4 bg-white/5 rounded-lg p-4 max-w-[80%]">
+              <p class="text-gray-200">欢迎使用天枢 AI 助手！我可以帮助您：</p>
+              <ul class="text-gray-300 mt-2 space-y-2">
+                <li>• 生成和编辑图片</li>
+                <li>• 制作和编辑视频</li>
+                <li>• 创建专业 PPT</li>
+                <li>• 回答各类问题</li>
+              </ul>
+            </div>
+          </div>
+          <!-- 用户消息 -->
+          <div class="flex items-start justify-end">
+            <div class="mr-4 bg-white/5 rounded-lg p-4 max-w-[80%]">
+              <p class="text-gray-200">你好，我想了解一下 AI 生图功能</p>
+            </div>
+            <div class="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center flex-shrink-0"> <i class="fas fa-user text-gray-400"></i> </div>
+          </div>
+          <!-- AI消息 -->
+          <div class="flex items-start">
+            <div class="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0"> <i class="fas fa-robot text-primary"></i> </div>
+            <div class="ml-4 bg-white/5 rounded-lg p-4 max-w-[80%]">
+              <p class="text-gray-200">我们的 AI 生图功能支持多种创作模式：</p>
+              <ul class="text-gray-300 mt-2 space-y-2">
+                <li>• 文本生成图像</li>
+                <li>• 图像编辑与优化</li>
+                <li>• 风格迁移</li>
+                <li>• 批量生成</li>
+              </ul>
+              <p class="text-gray-200 mt-4">您可以通过简单的文字描述来生成您想要的图像。需要我为您演示吗？</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 底部输入框 -->
+      <div class="fixed bottom-0 right-0 left-64 bg-[#04031e]">
+        <div class="mx-auto px-7 py-7">
+          <div class="flex flex-col bg-white/5 rounded-lg p-4">
+            <textarea class="flex-1 bg-transparent border-none outline-none text-gray-200 placeholder-gray-500 resize-none px-2 py-1 h-32 focus:bg-white/8" placeholder="输入您的问题..."></textarea>
+            <div class="flex items-center justify-between mt-4">
+              <div class="flex items-center space-x-2">
+                <button class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-200"> <i class="far fa-image fa-lg"></i> </button>
+                <button class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-200"> <i class="far fa-file-text fa-lg"></i> </button>
+              </div>
+              <button class="bg-primary text-white w-12 h-12 flex items-center justify-center rounded-full hover:bg-primary/90"> <i class="fas fa-arrow-up text-lg"></i> </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

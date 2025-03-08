@@ -1,0 +1,316 @@
+<template>
+  <div class="min-h-screen bg-[#0a0927] text-white">
+    <div class="p-4 md:p-8 flex flex-col h-screen">
+      <!-- 页面标题 -->
+      <div class="mb-6">
+        <h1 class="text-2xl md:text-3xl font-bold text-white mb-2">天枢助手</h1>
+        <p class="text-gray-400 text-sm">智能AI助手，为您解答问题、提供创意灵感</p>
+        
+        <!-- API连接状态提示 (新增) -->
+        <div class="mt-2 flex items-center">
+          <span class="inline-block w-3 h-3 rounded-full mr-1" 
+              :class="{
+                'bg-green-500': chatStore.connectionStatus === 'connected',
+                'bg-red-500': chatStore.connectionStatus === 'disconnected',
+                'bg-yellow-500': chatStore.connectionStatus === 'unknown'
+              }"></span>
+          <span class="text-xs" :class="{
+            'text-green-500': chatStore.connectionStatus === 'connected',
+            'text-red-500': chatStore.connectionStatus === 'disconnected',
+            'text-yellow-500': chatStore.connectionStatus === 'unknown'
+          }">
+            API状态: {{ chatStore.connectionStatus === 'connected' ? '已连接' : 
+                       chatStore.connectionStatus === 'disconnected' ? '未连接' : '未知' }}
+          </span>
+          <button @click="testConnection" class="ml-2 text-xs text-gray-400 hover:text-white">
+            <i class="fas fa-sync-alt mr-1"></i>测试连接
+          </button>
+        </div>
+      </div>
+      
+      <!-- 聊天区域 -->
+      <div class="flex-1 bg-[#0e0b36] rounded-xl p-4 md:p-6 mb-4 overflow-hidden flex flex-col">
+        <!-- 聊天记录 -->
+        <div class="flex-1 overflow-y-auto" ref="chatContainer">
+          <!-- 加载状态 -->
+          <div v-if="isLoading && messages.length === 0" class="flex justify-center py-10">
+            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+          </div>
+
+          <!-- 错误提示 -->
+          <div v-if="chatStore.error" class="flex justify-center py-4">
+            <div class="bg-red-500/20 text-red-200 px-4 py-2 rounded-lg">
+              {{ chatStore.error }}
+            </div>
+          </div>
+          
+          <div v-if="messages.length === 0 && !isLoading" class="h-full flex flex-col items-center justify-center text-center px-4">
+            <div class="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mb-4">
+              <i class="fas fa-robot text-primary text-2xl"></i>
+            </div>
+            <h3 class="text-lg font-medium mb-2">欢迎使用天枢助手</h3>
+            <p class="text-gray-400 text-sm max-w-md mb-8">
+              我是一个基于人工智能的助手，可以回答问题、提供创意建议、协助你完成各种任务。
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 w-full max-w-xl">
+              <button 
+                v-for="(suggestion, index) in suggestions" 
+                :key="index"
+                class="bg-primary/10 border border-primary/30 hover:bg-primary/20 rounded-lg p-3 text-left transition-colors"
+                @click="startConversation(suggestion)"
+              >
+                <p class="text-white text-sm">{{ suggestion }}</p>
+              </button>
+            </div>
+          </div>
+          
+          <div v-else class="space-y-6">
+            <!-- 实际消息 -->
+            <div v-for="msg in messages" :key="msg.id" class="flex items-start" :class="{'justify-end': msg.role === 'user'}">
+              <!-- AI消息 -->
+              <template v-if="msg.role === 'assistant'">
+                <div class="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <i class="fas fa-robot text-primary" :class="{'text-red-500': msg.isError}"></i>
+                </div>
+                <div class="ml-4 bg-white/5 rounded-lg p-4 max-w-[80%]" :class="{'bg-red-900/10 border border-red-500/20': msg.isError}">
+                  <div v-if="msg.isStreaming" class="flex items-center">
+                    <p class="text-gray-200" v-html="formatMessage(msg.content || '')"></p>
+                    <div class="typing-indicator ml-2">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                  </div>
+                  <p v-else class="text-gray-200" v-html="formatMessage(msg.content || '')"></p>
+                  
+                  <!-- 消息控制按钮 -->
+                  <div v-if="!msg.isError" class="mt-3 flex justify-end space-x-2 text-xs">
+                    <button v-if="msg.isStreaming" @click="chatStore.stopGenerating()" 
+                            class="text-gray-400 hover:text-gray-200">
+                      <i class="fas fa-stop mr-1"></i>停止生成
+                    </button>
+                  </div>
+                </div>
+              </template>
+              
+              <!-- 用户消息 -->
+              <template v-else>
+                <div class="mr-4 bg-white/5 rounded-lg p-4 max-w-[80%]">
+                  <p class="text-gray-200">{{ msg.content }}</p>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center flex-shrink-0">
+                  <i class="fas fa-user text-gray-400"></i>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部输入区域 -->
+      <div class="mt-4">
+        <div class="relative">
+          <textarea 
+            v-model="userInput" 
+            @keydown.enter.prevent="sendMessage"
+            placeholder="输入您的问题..." 
+            class="bg-gray-900 border border-gray-700 rounded-xl text-white p-4 pr-12 w-full focus:outline-none focus:border-primary"
+            rows="1"
+            ref="textareaRef"
+          ></textarea>
+          <button 
+            @click="sendMessage" 
+            class="absolute right-3 bottom-3 w-8 h-8 bg-primary rounded-lg flex items-center justify-center"
+            :disabled="isLoading || !userInput.trim()"
+            :class="{'opacity-50 cursor-not-allowed': isLoading || !userInput.trim()}"
+          >
+            <i class="fas fa-paper-plane text-white text-sm"></i>
+          </button>
+        </div>
+        <div class="text-xs text-gray-500 mt-2 text-center">天枢科技AI助手，为您提供智能解答</div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { useChatStore } from '../stores/chat'
+
+// 使用聊天状态存储
+const chatStore = useChatStore()
+
+// DOM引用
+const chatContainer = ref(null)
+const textareaRef = ref(null)
+
+// 用户输入
+const userInput = ref('')
+
+// 对话建议
+const suggestions = [
+  "你好，我想了解一下天枢AI能做什么?",
+  "请帮我写一份周报",
+  "帮我分析一下当前人工智能的发展趋势",
+  "介绍一下如何使用AI提高工作效率"
+]
+
+// 自动调整文本框高度
+const adjustTextareaHeight = () => {
+  if (!textareaRef.value) return
+  textareaRef.value.style.height = 'auto'
+  textareaRef.value.style.height = `${Math.min(textareaRef.value.scrollHeight, 150)}px`
+}
+
+watch(userInput, adjustTextareaHeight)
+
+// 计算属性
+const isLoading = computed(() => chatStore.isLoading)
+const messages = computed(() => chatStore.sortedMessages)
+
+// 页面加载时初始化
+onMounted(async () => {
+  // 初始化聊天状态
+  await chatStore.initialize()
+  
+  // 检查API连接状态
+  await chatStore.checkConnection()
+  
+  // 创建新会话
+  chatStore.createNewConversation()
+  
+  // 自动滚动到底部
+  nextTick(() => {
+    scrollToBottom()
+  })
+})
+
+// 监听消息变化，自动滚动到底部
+watch(() => messages.value.length, async () => {
+  await nextTick()
+  scrollToBottom()
+})
+
+// 发送消息
+const sendMessage = async () => {
+  const content = userInput.value.trim()
+  if (!content || isLoading.value) return
+  
+  // 清空输入框
+  userInput.value = ''
+  adjustTextareaHeight()
+  
+  // 发送消息到API
+  await chatStore.sendMessage(content)
+  
+  // 滚动到底部
+  await nextTick()
+  scrollToBottom()
+}
+
+// 开始以建议开始对话
+const startConversation = (suggestion) => {
+  userInput.value = suggestion
+  sendMessage()
+}
+
+// 滚动到底部
+const scrollToBottom = () => {
+  if (chatContainer.value) {
+    chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+  }
+}
+
+// 格式化消息内容（处理换行、链接等）
+const formatMessage = (content) => {
+  if (!content) return ''
+  
+  // 替换换行符为<br>
+  let formatted = content.replace(/\n/g, '<br>')
+  
+  // 将URL转换为可点击的链接
+  formatted = formatted.replace(
+    /(https?:\/\/[^\s]+)/g, 
+    '<a href="$1" target="_blank" class="text-primary hover:underline">$1</a>'
+  )
+  
+  // 处理代码块
+  formatted = formatted.replace(
+    /```([a-z]*)\n([\s\S]+?)\n```/g,
+    '<pre class="bg-gray-800 p-3 rounded my-2 overflow-x-auto"><code class="text-gray-300">$2</code></pre>'
+  )
+  
+  // 处理行内代码
+  formatted = formatted.replace(
+    /`([^`]+)`/g,
+    '<code class="bg-gray-800 px-1 rounded text-gray-300">$1</code>'
+  )
+  
+  return formatted
+}
+
+// 测试API连接
+const testConnection = async () => {
+  await chatStore.checkConnection()
+}
+</script>
+
+<style scoped>
+/* 聊天相关样式 */
+.message-container:last-child {
+  margin-bottom: 10px;
+}
+
+/* 美化滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* 打字指示器动画 */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+}
+
+.typing-indicator span {
+  height: 6px;
+  width: 6px;
+  background: #6366f1;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 3px;
+  animation: typingBounce 1.5s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+  margin-right: 0;
+}
+
+@keyframes typingBounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-4px);
+  }
+}
+</style> 

@@ -1,0 +1,140 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: #5D87FF;
+    --color-secondary: #49BEFF;
+  }
+  
+  body {
+    @apply bg-[#04031e] text-white min-h-screen;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+}
+
+/* 导航样式 */
+.nav-item:hover {
+  @apply bg-white/5;
+}
+
+.nav-item-on {
+  @apply bg-white/10 text-primary;
+}
+
+/* 卡片样式 */
+.tool-card {
+  @apply bg-white/5 rounded-xl transition-all duration-300;
+  backdrop-filter: blur(10px);
+}
+
+.tool-card:hover {
+  @apply bg-white/10 shadow-lg transform -translate-y-1;
+  box-shadow: 0 10px 25px -5px rgba(93, 135, 255, 0.1);
+}
+
+/* 项目卡片 */
+.work-card {
+  @apply bg-white/5 rounded-xl overflow-hidden transition-all duration-300;
+  backdrop-filter: blur(10px);
+}
+
+.work-card img {
+  @apply transition-all duration-500;
+}
+
+.work-card:hover img {
+  @apply scale-110;
+}
+
+/* 动画 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  @apply w-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-800 rounded;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-600 rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-500;
+}
+
+/* 移动设备优化 */
+@media (max-width: 768px) {
+  html {
+    font-size: 95%;
+  }
+  
+  /* 移动端间距优化 */
+  .p-responsive {
+    @apply p-4;
+  }
+  
+  /* 移动端标题字体调整 */
+  h1.responsive {
+    @apply text-2xl;
+  }
+  
+  h2.responsive {
+    @apply text-xl;
+  }
+  
+  /* 移动端卡片高度调整 */
+  .tool-card {
+    @apply h-auto;
+  }
+}
+
+/* 修复移动设备上的滚动行为 */
+html {
+  @apply overflow-x-hidden;
+  overscroll-behavior: none;
+  scroll-behavior: smooth;
+}
+
+/* WebKit浏览器 */
+::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+::-webkit-scrollbar-track {
+    background: #222130;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #484850;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #5d5d67;
+}
+
+/* Firefox浏览器 */
+html {
+    scrollbar-width: thin;
+    scrollbar-color: #484850 #222130;
+} 

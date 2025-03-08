@@ -1,0 +1,3 @@
+@echo off
+echo 正在启动天枢AI开发服务器...
+npm run dev -- --host 
