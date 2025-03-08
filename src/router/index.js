@@ -47,6 +47,114 @@ const router = createRouter({
       name: 'forbidden',
       component: () => import('../views/Forbidden.vue')
     },
+    // 天枢助手子页面
+    {
+      path: '/assistant/intelligent',
+      name: 'intelligent-assistant',
+      component: () => import('../views/assistants/IntelligentAssistant.vue')
+    },
+    {
+      path: '/assistant/solution',
+      name: 'solution-assistant',
+      component: () => import('../views/assistants/SolutionAssistant.vue')
+    },
+    {
+      path: '/assistant/image',
+      name: 'image-assistant',
+      component: () => import('../views/assistants/ImageAssistant.vue')
+    },
+    {
+      path: '/assistant/image-text',
+      name: 'image-text-assistant',
+      component: () => import('../views/assistants/ImageTextAssistant.vue')
+    },
+    {
+      path: '/assistant/travel',
+      name: 'travel-assistant',
+      component: () => import('../views/assistants/TravelAssistant.vue')
+    },
+    {
+      path: '/assistant/search',
+      name: 'search-assistant',
+      component: () => import('../views/assistants/SearchAssistant.vue')
+    },
+    {
+      path: '/assistant/enterprise',
+      name: 'enterprise-assistant',
+      component: () => import('../views/assistants/EnterpriseAssistant.vue')
+    },
+    {
+      path: '/assistant/virtual',
+      name: 'virtual-assistant',
+      component: () => import('../views/assistants/VirtualAssistant.vue')
+    },
+    // 智能工具集子页面
+    {
+      path: '/tools/photo-restoration',
+      name: 'photo-restoration',
+      component: () => import('../views/tools/PhotoRestoration.vue')
+    },
+    {
+      path: '/tools/voice-synthesis',
+      name: 'voice-synthesis',
+      component: () => import('../views/tools/VoiceSynthesis.vue')
+    },
+    {
+      path: '/tools/text-to-video',
+      name: 'text-to-video',
+      component: () => import('../views/tools/TextToVideo.vue')
+    },
+    {
+      path: '/tools/translation',
+      name: 'translation-tool',
+      component: () => import('../views/tools/TranslationTool.vue')
+    },
+    {
+      path: '/tools/image-recognition',
+      name: 'image-recognition',
+      component: () => import('../views/tools/ImageRecognition.vue')
+    },
+    {
+      path: '/tools/digital-human',
+      name: 'digital-human',
+      component: () => import('../views/tools/DigitalHuman.vue')
+    },
+    {
+      path: '/tools/virtual-try-on',
+      name: 'virtual-try-on',
+      component: () => import('../views/tools/VirtualTryOn.vue')
+    },
+    {
+      path: '/tools/nail-try-on',
+      name: 'nail-try-on',
+      component: () => import('../views/tools/NailTryOn.vue')
+    },
+    // 观星阁子页面
+    {
+      path: '/astrology/destiny',
+      name: 'destiny',
+      component: () => import('../views/astrology/Destiny.vue')
+    },
+    {
+      path: '/astrology/feng-shui',
+      name: 'feng-shui',
+      component: () => import('../views/astrology/FengShui.vue')
+    },
+    {
+      path: '/astrology/divination',
+      name: 'divination',
+      component: () => import('../views/astrology/Divination.vue')
+    },
+    {
+      path: '/astrology/ziwei-doushu',
+      name: 'ziwei-doushu',
+      component: () => import('../views/astrology/ZiweiDoushu.vue')
+    },
+    {
+      path: '/astrology/tianji',
+      name: 'tianji',
+      component: () => import('../views/astrology/Tianji.vue')
+    },
     // 添加中台路由
     ...adminRoutes
   ]

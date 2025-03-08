@@ -3,8 +3,8 @@
     <div class="p-4 md:p-8 flex flex-col h-full">
       <!-- 页面标题 -->
       <div class="mb-6 flex-shrink-0">
-        <h1 class="text-2xl md:text-3xl font-bold text-white mb-2">天枢助手</h1>
-        <p class="text-gray-400 text-sm">智能AI助手，为您解答问题、提供创意灵感</p>
+        <h1 class="text-2xl md:text-3xl font-bold text-white mb-2">文旅助手</h1>
+        <p class="text-gray-400 text-sm">专为浙江省丽水市云和县定制的智能AI导游，提供景点推荐、行程规划和文化探索</p>
         
         <!-- API连接状态提示 -->
         <div class="mt-2 flex items-center">
@@ -46,11 +46,11 @@
           
           <div v-if="messages.length === 0 && !isLoading" class="h-full flex flex-col items-center justify-center text-center px-4">
             <div class="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mb-4">
-              <i class="fas fa-robot text-primary text-2xl"></i>
+              <i class="fas fa-globe text-primary text-2xl"></i>
             </div>
-            <h3 class="text-lg font-medium mb-2">欢迎使用天枢助手</h3>
+            <h3 class="text-lg font-medium mb-2">欢迎使用文旅助手</h3>
             <p class="text-gray-400 text-sm max-w-md mb-8">
-              我是一个基于人工智能的助手，可以回答问题、提供创意建议、协助你完成各种任务。
+              我是您的智能旅游与文化顾问，可以推荐景点、规划行程、讲解历史文化，让您的旅行更加丰富多彩。
             </p>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 w-full max-w-xl">
               <button 
@@ -139,7 +139,7 @@
             <i class="fas fa-paper-plane text-white text-sm"></i>
           </button>
         </div>
-        <div class="text-xs text-gray-500 mt-2 text-center">天枢科技AI助手，为您提供智能解答</div>
+        <div class="text-xs text-gray-500 mt-2 text-center">文旅助手，让您的旅行更加精彩</div>
       </div>
     </div>
   </div>
@@ -162,10 +162,10 @@ const userInput = ref('')
 
 // 对话建议
 const suggestions = [
-  "你好，我想了解一下天枢AI能做什么?",
-  "请帮我写一份周报",
-  "帮我分析一下当前人工智能的发展趋势",
-  "介绍一下如何使用AI提高工作效率"
+  "云和县有哪些必去的旅游景点和打卡地？",
+  "请帮我规划一份云和梯田+云和湖二日游行程",
+  "云和县的特色美食和伴手礼有哪些推荐？",
+  "云和木玩小镇有什么特色体验项目和活动？"
 ]
 
 // 自动调整文本框高度

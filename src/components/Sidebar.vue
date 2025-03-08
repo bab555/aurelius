@@ -42,64 +42,263 @@
             <span class="ml-3">首页</span>
           </a>
           
-          <!-- 天枢助手选项 -->
-          <a 
-            href="/assistant" 
-            class="nav-item flex items-center text-gray-300 px-4 py-3 rounded-lg hover:text-white" 
-            :class="{'nav-item-on': currentPath === '/assistant'}"
-            @click.prevent="handleNavClick('/assistant', $event)"
-          >
-            <i class="fas fa-robot w-6 h-6 flex items-center justify-center"></i>
-            <span class="ml-3">天枢助手</span>
-          </a>
-          
-          <!-- 添加更多导航项以确保滚动条显示 -->
+          <!-- 天枢助手大类 -->
           <div class="space-y-2">
-            <div class="nav-item text-gray-300 px-4 py-3 rounded-lg hover:text-white cursor-pointer flex items-center">
-              <i class="fas fa-wand-magic-sparkles w-6 h-6 flex items-center justify-center"></i>
-              <span class="ml-3">AI 工具</span>
+            <div 
+              class="nav-item text-gray-300 px-4 py-3 rounded-lg hover:text-white cursor-pointer flex items-center justify-between"
+              @click="toggleCategory('assistant')"
+              :class="{'nav-item-on bg-primary/5': expandedCategories.assistant}"
+            >
+              <div class="flex items-center">
+                <i class="fas fa-robot w-6 h-6 flex items-center justify-center"></i>
+                <span class="ml-3">天枢助手</span>
+              </div>
+              <i :class="expandedCategories.assistant ? 'fas fa-chevron-down' : 'fas fa-chevron-right'" class="text-xs"></i>
             </div>
             
-            <div class="ml-8 space-y-2">
+            <div class="ml-8 space-y-2" v-show="expandedCategories.assistant">
               <a 
-                href="/chat" 
+                href="/assistant/intelligent" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/assistant/intelligent'}"
+                @click.prevent="handleNavClick('/assistant/intelligent', $event)"
+              >
+                <i class="fas fa-brain w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>智能助手</span>
+              </a>
+              <a 
+                href="/assistant/solution" 
                 class="text-gray-400 hover:text-white block py-2 flex items-center pointer-events-auto" 
-                :class="{'text-primary': currentPath === '/chat'}"
-                @click.prevent="handleNavClick('/chat', $event)"
+                :class="{'text-primary': currentPath === '/assistant/solution'}"
+                @click.prevent="handleNavClick('/assistant/solution', $event)"
               >
                 <i class="far fa-edit w-5 h-5 flex items-center justify-center mr-2"></i>
-                <span>AI 方案助手</span>
+                <span>方案助手</span>
               </a>
-              <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center">
-                <i class="far fa-commenting w-5 h-5 flex items-center justify-center mr-2"></i>
-                <span>AI 文生图</span>
-              </a>
-              <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center">
+              <a 
+                href="/assistant/image" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/assistant/image'}"
+                @click.prevent="handleNavClick('/assistant/image', $event)"
+              >
                 <i class="far fa-image w-5 h-5 flex items-center justify-center mr-2"></i>
-                <span>AI 修图</span>
+                <span>生图助手</span>
               </a>
-              <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center">
+              <a 
+                href="/assistant/image-text" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/assistant/image-text'}"
+                @click.prevent="handleNavClick('/assistant/image-text', $event)"
+              >
+                <i class="fas fa-file-image w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>图文助手</span>
+              </a>
+              <a 
+                href="/assistant" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/assistant'}"
+                @click.prevent="handleNavClick('/assistant', $event)"
+              >
+                <i class="fas fa-globe w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>文旅助手</span>
+              </a>
+              <a 
+                href="/assistant/search" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/assistant/search'}"
+                @click.prevent="handleNavClick('/assistant/search', $event)"
+              >
+                <i class="fas fa-search w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>搜索助手</span>
+              </a>
+              <a 
+                href="/assistant/enterprise" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/assistant/enterprise'}"
+                @click.prevent="handleNavClick('/assistant/enterprise', $event)"
+              >
+                <i class="fas fa-building w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>企业助手</span>
+              </a>
+              <a 
+                href="/assistant/virtual" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/assistant/virtual'}"
+                @click.prevent="handleNavClick('/assistant/virtual', $event)"
+              >
+                <i class="fas fa-headset w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>虚拟客服</span>
+              </a>
+            </div>
+          </div>
+          
+          <!-- 智能工具集大类 -->
+          <div class="space-y-2">
+            <div 
+              class="nav-item text-gray-300 px-4 py-3 rounded-lg hover:text-white cursor-pointer flex items-center justify-between"
+              @click="toggleCategory('tools')"
+              :class="{'nav-item-on bg-primary/5': expandedCategories.tools}"
+            >
+              <div class="flex items-center">
+                <i class="fas fa-wand-magic-sparkles w-6 h-6 flex items-center justify-center"></i>
+                <span class="ml-3">智能工具集</span>
+              </div>
+              <i :class="expandedCategories.tools ? 'fas fa-chevron-down' : 'fas fa-chevron-right'" class="text-xs"></i>
+            </div>
+            
+            <div class="ml-8 space-y-2" v-show="expandedCategories.tools">
+              <a 
+                href="/tools/photo-restoration" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/tools/photo-restoration'}"
+                @click.prevent="handleNavClick('/tools/photo-restoration', $event)"
+              >
+                <i class="fas fa-camera-retro w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>照片修复</span>
+              </a>
+              <a 
+                href="/tools/voice-synthesis" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/tools/voice-synthesis'}"
+                @click.prevent="handleNavClick('/tools/voice-synthesis', $event)"
+              >
+                <i class="fas fa-microphone-alt w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>语音合成</span>
+              </a>
+              <a 
+                href="/tools/text-to-video" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/tools/text-to-video'}"
+                @click.prevent="handleNavClick('/tools/text-to-video', $event)"
+              >
                 <i class="fas fa-film w-5 h-5 flex items-center justify-center mr-2"></i>
-                <span>AI 视频</span>
+                <span>文生视频</span>
               </a>
-              <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center">
-                <i class="far fa-file-powerpoint w-5 h-5 flex items-center justify-center mr-2"></i>
-                <span>AI PPT 助手</span>
+              <a 
+                href="/tools/translation" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/tools/translation'}"
+                @click.prevent="handleNavClick('/tools/translation', $event)"
+              >
+                <i class="fas fa-language w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>翻译工具</span>
               </a>
-              <a href="#" class="text-gray-400 hover:text-white block py-2 flex items-center">
-                <i class="far fa-hdd w-5 h-5 flex items-center justify-center mr-2"></i>
-                <span>AI 文字游戏</span>
+              <a 
+                href="/tools/image-recognition" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/tools/image-recognition'}"
+                @click.prevent="handleNavClick('/tools/image-recognition', $event)"
+              >
+                <i class="fas fa-eye w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>图片识别</span>
+              </a>
+              <a 
+                href="/tools/digital-human" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/tools/digital-human'}"
+                @click.prevent="handleNavClick('/tools/digital-human', $event)"
+              >
+                <i class="fas fa-user-circle w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>图片数字人</span>
+              </a>
+              <a 
+                href="/tools/virtual-try-on" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/tools/virtual-try-on'}"
+                @click.prevent="handleNavClick('/tools/virtual-try-on', $event)"
+              >
+                <i class="fas fa-tshirt w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>虚拟试穿</span>
+              </a>
+              <a 
+                href="/tools/nail-try-on" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/tools/nail-try-on'}"
+                @click.prevent="handleNavClick('/tools/nail-try-on', $event)"
+              >
+                <i class="fas fa-hand-sparkles w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>美甲试穿</span>
+              </a>
+            </div>
+          </div>
+          
+          <!-- 观星阁选项 -->
+          <div class="space-y-2">
+            <div 
+              class="nav-item text-gray-300 px-4 py-3 rounded-lg hover:text-white cursor-pointer flex items-center justify-between"
+              @click="toggleCategory('astrology')"
+              :class="{'nav-item-on bg-primary/5': expandedCategories.astrology}"
+            >
+              <div class="flex items-center">
+                <i class="fas fa-star w-6 h-6 flex items-center justify-center"></i>
+                <span class="ml-3">观星阁</span>
+              </div>
+              <i :class="expandedCategories.astrology ? 'fas fa-chevron-down' : 'fas fa-chevron-right'" class="text-xs"></i>
+            </div>
+            
+            <div class="ml-8 space-y-2" v-show="expandedCategories.astrology">
+              <a 
+                href="/astrology/destiny" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/astrology/destiny'}"
+                @click.prevent="handleNavClick('/astrology/destiny', $event)"
+              >
+                <i class="fas fa-moon w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>命理</span>
+              </a>
+              <a 
+                href="/astrology/feng-shui" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/astrology/feng-shui'}"
+                @click.prevent="handleNavClick('/astrology/feng-shui', $event)"
+              >
+                <i class="fas fa-compass w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>风水</span>
+              </a>
+              <a 
+                href="/astrology/divination" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/astrology/divination'}"
+                @click.prevent="handleNavClick('/astrology/divination', $event)"
+              >
+                <i class="fas fa-book w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>卦师</span>
+              </a>
+              <a 
+                href="/astrology/ziwei-doushu" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/astrology/ziwei-doushu'}"
+                @click.prevent="handleNavClick('/astrology/ziwei-doushu', $event)"
+              >
+                <i class="fas fa-dice w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>斗数</span>
+              </a>
+              <a 
+                href="/astrology/tianji" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/astrology/tianji'}"
+                @click.prevent="handleNavClick('/astrology/tianji', $event)"
+              >
+                <i class="fas fa-cloud w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>天机</span>
               </a>
             </div>
           </div>
           
           <div class="space-y-2">
-            <div class="nav-item text-gray-300 px-4 py-3 rounded-lg hover:text-white cursor-pointer flex items-center">
-              <i class="fas fa-info-circle w-6 h-6 flex items-center justify-center"></i>
-              <span class="ml-3">了解我们</span>
+            <div 
+              class="nav-item text-gray-300 px-4 py-3 rounded-lg hover:text-white cursor-pointer flex items-center justify-between"
+              @click="toggleCategory('about')"
+              :class="{'nav-item-on bg-primary/5': expandedCategories.about}"
+            >
+              <div class="flex items-center">
+                <i class="fas fa-info-circle w-6 h-6 flex items-center justify-center"></i>
+                <span class="ml-3">了解我们</span>
+              </div>
+              <i :class="expandedCategories.about ? 'fas fa-chevron-down' : 'fas fa-chevron-right'" class="text-xs"></i>
             </div>
             
-            <div class="ml-8 space-y-2">
+            <div class="ml-8 space-y-2" v-show="expandedCategories.about">
               <a 
                 href="/about" 
                 class="text-gray-400 hover:text-white block py-2 flex items-center pointer-events-auto" 
@@ -139,7 +338,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -148,6 +347,34 @@ const isMenuOpen = ref(false)
 
 // 当前路由路径
 const currentPath = computed(() => route.path)
+
+// 各大类展开状态
+const expandedCategories = reactive({
+  assistant: true, // 默认展开第一个分类
+  tools: false,
+  astrology: false,
+  about: false
+})
+
+// 切换分类展开状态
+const toggleCategory = (category) => {
+  expandedCategories[category] = !expandedCategories[category]
+}
+
+// 根据当前路径自动展开分类
+const autoExpandCategory = () => {
+  const path = currentPath.value
+  
+  if (path.startsWith('/assistant')) {
+    expandedCategories.assistant = true
+  } else if (path.startsWith('/tools')) {
+    expandedCategories.tools = true
+  } else if (path.startsWith('/astrology')) {
+    expandedCategories.astrology = true
+  } else if (path === '/about') {
+    expandedCategories.about = true
+  }
+}
 
 // 移动端点击导航链接后关闭菜单
 const closeMenuOnMobile = () => {
@@ -214,6 +441,9 @@ onMounted(() => {
   // 立即执行一次
   makeLinksClickable();
   
+  // 根据当前路径自动展开分类
+  autoExpandCategory();
+  
   // 页面加载后再次执行
   window._scrollTimers.push(setTimeout(makeLinksClickable, 500));
   
@@ -256,6 +486,7 @@ onMounted(() => {
 .nav-item {
   isolation: isolate; /* 创建新的堆叠上下文 */
   position: relative;
+  transition: all 0.2s ease;
 }
 
 /* 侧边栏滚动区域样式 */
