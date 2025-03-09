@@ -423,8 +423,9 @@ const formatMessage = (content) => {
   if (!content) return ''
   
   try {
-    // 替换换行符为<br>
-    let formatted = content.replace(/\n/g, '<br>')
+    // 保留原始换行符，不做替换
+    // let formatted = content.replace(/\n/g, '<br>')
+    let formatted = content
     
     // 将URL转换为可点击的链接
     formatted = formatted.replace(
@@ -432,10 +433,11 @@ const formatMessage = (content) => {
       '<a href="$1" target="_blank" class="text-primary hover:underline">$1</a>'
     )
 
-    // 先处理完整的details标签
-    if (formatted.includes('<details>') && formatted.includes('</details>')) {
+    // 先处理完整的details标签，但跳过已处理的思考框
+    if (formatted.includes('<details>') && formatted.includes('</details>') && !formatted.includes('class="thinking-box"')) {
       try {
-        const detailsPattern = /<details>([\s\S]*?)<summary>([\s\S]*?)<\/summary>([\s\S]*?)<\/details>/g;
+        // 跳过思考框内容，仅处理其他details
+        const detailsPattern = /<details>([\s\S]*?)<summary>(?!Thinking)([\s\S]*?)<\/summary>([\s\S]*?)<\/details>/g;
         formatted = formatted.replace(detailsPattern, 
           '<details class="my-3 bg-[#070620] rounded-lg overflow-hidden border border-primary/10"><summary class="p-3 cursor-pointer text-gray-300 font-medium hover:bg-[#0a0830] transition-colors">$2</summary><div class="p-3 border-t border-primary/10 bg-[#080722] text-gray-300">$3</div></details>');
       } catch (e) {
@@ -444,8 +446,8 @@ const formatMessage = (content) => {
     }
     
     // 处理不完整的details和summary标签
-    if (formatted.includes('<details>') && !formatted.includes('</details>')) {
-      formatted = formatted.replace(/<details>([\s\S]*)$/, 
+    if (formatted.includes('<details>') && !formatted.includes('</details>') && !formatted.includes('class="thinking-box"')) {
+      formatted = formatted.replace(/<details>(?![\s\S]*?Thinking)([\s\S]*)$/, 
         '<div class="bg-[#070620] rounded-lg p-3 border border-primary/10 text-gray-300">$1</div>');
     }
     
@@ -467,7 +469,7 @@ const formatMessage = (content) => {
     )
     
     // 最后将换行符替换为<br>
-    formatted = formatted.replace(/\n/g, '<br>')
+    // formatted = formatted.replace(/\n/g, '<br>')
     
     // 将URL转换为可点击的链接
     formatted = formatted.replace(
@@ -496,6 +498,11 @@ onBeforeUnmount(() => {
 /* 聊天相关样式 */
 .message-container:last-child {
   margin-bottom: 10px;
+}
+
+/* 确保文本正确换行的关键样式 */
+.text-gray-200, .text-gray-300, p {
+  white-space: pre-wrap !important;
 }
 
 /* WebKit浏览器滚动条样式 */

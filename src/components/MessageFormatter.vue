@@ -1,11 +1,17 @@
 <template>
   <div class="message-formatter">
-    <template v-if="hasCodeBlock">
+    <!-- 当内容包含markdown代码块且内容包含八字排盘内容时，使用格式化处理，不进入代码块模式 -->
+    <template v-if="hasCodeBlock && (content.includes('八字') || content.includes('命盘') || content.includes('五行'))">
+      <div class="content-container" :class="{'allow-copy': allowCopy}" v-html="formatGeneral()"></div>
+    </template>
+    
+    <!-- 处理普通代码块 -->
+    <template v-else-if="hasCodeBlock">
       <code-block :code="extractCodeBlock()" :language="extractCodeLanguage()"></code-block>
     </template>
     
     <template v-else-if="hasDetailsBlock">
-      <div class="custom-details-container">
+      <div class="custom-details-container" :class="{'allow-copy': allowCopy}">
         <details 
           class="my-3 bg-[#070620] rounded-lg overflow-hidden border border-primary/10"
           :class="{'is-open': isOpen}"
@@ -20,7 +26,7 @@
     </template>
     
     <template v-else>
-      <div class="content-container" v-html="formatGeneral()"></div>
+      <div class="content-container" :class="{'allow-copy': allowCopy}" v-html="formatGeneral()"></div>
     </template>
   </div>
 </template>
@@ -34,6 +40,10 @@ const props = defineProps({
   content: {
     type: String,
     required: true
+  },
+  allowCopy: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -47,7 +57,31 @@ const handleDetailsToggle = (event) => {
 
 // 检测是否包含代码块
 const hasCodeBlock = computed(() => {
-  return /```([a-z]*)\n([\s\S]+?)\n```/g.test(props.content);
+  // 修改正则表达式，确保准确匹配代码块
+  // 使用更精确的检测，确保仅识别独立的代码块
+  const codeBlockRegex = /^```([a-z]*)\n([\s\S]+?)\n```$/;
+  const hasInlineCode = /```([a-z]*)\n([\s\S]+?)\n```/g.test(props.content);
+  
+  // 检查是否是markdown格式的命理内容
+  const isBaziMarkdown = (props.content.includes('八字') || props.content.includes('命盘') || props.content.includes('五行')) 
+                       && props.content.includes('```markdown');
+  
+  // 如果是命理内容且有markdown标记，使用特殊处理
+  if (isBaziMarkdown) {
+    console.log('检测到markdown格式的命理内容，使用特殊处理');
+    return true;
+  }
+  
+  return hasInlineCode;
+});
+
+// 检测内容中是否含有多个代码块
+const hasMultipleCodeBlocks = computed(() => {
+  if (!props.content) return false;
+  
+  // 计算代码块的数量
+  const matches = props.content.match(/```([a-z]*)\n/g);
+  return matches && matches.length > 1;
 });
 
 // 检测是否包含details标签
@@ -59,7 +93,7 @@ const hasDetailsBlock = computed(() => {
   return hasDetailsOpen && hasDetailsClose && hasSummaryOpen;
 });
 
-// 提取代码块
+// 提取第一个代码块
 function extractCodeBlock() {
   try {
     const codeMatch = props.content.match(/```([a-z]*)\n([\s\S]+?)\n```/);
@@ -122,6 +156,262 @@ const emits = defineEmits(['thinking-processing', 'thinking-processed']);
 function formatGeneral(text = props.content) {
   let formatted = text || ''; // 确保text不是null或undefined
   
+  // 处理多个思考框（双模型叠加作业）
+  if (formatted.includes('<details') && formatted.includes('Thinking')) {
+    try {
+      // 发出内容处理开始信号
+      emits('thinking-processing');
+      
+      // 添加调试信息，查看内容长度和预览
+      console.log('检测到思考标签，内容长度:', formatted.length, '前100字符:', formatted.substring(0, 100));
+      
+      // 首先检查是否有多个 <details 标签，这可能表示多个思考框
+      const detailsCount = (formatted.match(/<details/g) || []).length;
+      const hasMultipleDetails = detailsCount > 1;
+      
+      console.log('检测到details标签数量:', detailsCount);
+      
+      // 检查已完成的思考框数量
+      const completedThinkingCount = (formatted.match(/<details[^>]*>[\s\S]*?<\/details>/g) || []).length;
+      console.log('完整思考框数量:', completedThinkingCount);
+      
+      // 支持多个思考框的正则表达式 - 同时匹配完整和不完整的思考框
+      const allThinkingBlocks = [];
+      
+      // 1. 先尝试匹配完整的思考框
+      const completeThinkingRegex = /<details[^>]*>\s*<summary>\s*Thinking[^<]*<\/summary>([\s\S]*?)<\/details>/gi;
+      
+      let match;
+      let processedText = formatted;
+      let index = 0;
+      
+      // 提取所有完整的思考块
+      while ((match = completeThinkingRegex.exec(formatted)) !== null) {
+        const fullMatch = match[0];
+        const thinkingContent = match[1].trim();
+        
+        // 替换为临时标记
+        const placeholder = `__THINKING_BLOCK_${index}__`;
+        processedText = processedText.replace(fullMatch, placeholder);
+        
+        // 存储思考块信息
+        allThinkingBlocks.push({
+          content: thinkingContent,
+          placeholder,
+          isComplete: true
+        });
+        
+        index++;
+      }
+      
+      // 2. 再检查是否有不完整的思考框（没有结束标签）
+      if (hasMultipleDetails && allThinkingBlocks.length < detailsCount) {
+        // 可能有不完整的思考框，尝试匹配
+        // 使用更宽松的正则表达式，匹配开始但没有结束的思考框
+        const incompleteThinkingRegex = /<details[^>]*>\s*<summary>\s*Thinking[^<]*<\/summary>([\s\S]*)$/gi;
+        
+        // 重置正则状态
+        incompleteThinkingRegex.lastIndex = 0;
+        
+        // 找到可能的不完整思考框
+        const incompleteMatch = incompleteThinkingRegex.exec(processedText);
+        if (incompleteMatch) {
+          const fullMatch = incompleteMatch[0];
+          const thinkingContent = incompleteMatch[1].trim();
+          
+          // 只有当这部分没有被前面的完整匹配替换过，才处理它
+          if (processedText.includes(fullMatch)) {
+            const placeholder = `__THINKING_BLOCK_${index}__`;
+            processedText = processedText.replace(fullMatch, placeholder);
+            
+            allThinkingBlocks.push({
+              content: thinkingContent,
+              placeholder,
+              isComplete: false
+            });
+            
+            index++;
+          }
+        }
+        
+        // 更积极地检测第二个思考框 - 寻找第二个details开头但还没完成的思考框
+        if (allThinkingBlocks.length < detailsCount) {
+          // 提取第一个完整思考框后的所有内容
+          const remainingContent = processedText.split('__THINKING_BLOCK_0__')[1] || '';
+          
+          // 检查是否有details开头的内容
+          if (remainingContent.includes('<details') && remainingContent.includes('Thinking')) {
+            console.log('在剩余内容中检测到可能的第二个思考框');
+            
+            // 尝试匹配第二个思考框的开始部分
+            const secondThinkingMatch = remainingContent.match(/<details[^>]*>[\s\S]*?<summary>[\s\S]*?Thinking[\s\S]*?<\/summary>([\s\S]*)/i);
+            
+            if (secondThinkingMatch) {
+              const fullMatch = secondThinkingMatch[0];
+              let thinkingContent = secondThinkingMatch[1].trim();
+              
+              // 限制内容长度，避免匹配过多
+              if (thinkingContent.length > 1000) {
+                thinkingContent = thinkingContent.substring(0, 1000) + '...';
+              }
+              
+              const placeholder = `__THINKING_BLOCK_${index}__`;
+              
+              // 替换处理后的内容
+              const updatedContent = remainingContent.replace(fullMatch, placeholder);
+              processedText = processedText.replace(remainingContent, updatedContent);
+              
+              allThinkingBlocks.push({
+                content: thinkingContent,
+                placeholder,
+                isComplete: false
+              });
+              
+              index++;
+            }
+          }
+        }
+      }
+      
+      // 如果检测到思考框
+      if (allThinkingBlocks.length > 0) {
+        console.log(`检测到 ${allThinkingBlocks.length} 个思考框，其中完整的有 ${completedThinkingCount} 个`);
+        
+        // 处理每个思考框
+        for (let i = 0; i < allThinkingBlocks.length; i++) {
+          const { content, placeholder, isComplete } = allThinkingBlocks[i];
+          
+          // 处理内容，移除多余的空白和缩进
+          const processedContent = trimThinkingContent(content);
+          
+          // 减小估计高度的系数，进一步降低高度
+          const estimatedHeight = Math.max(50, Math.min(150, processedContent.length / 30));
+          
+          // 对不完整的思考框添加"思考中..."状态
+          const thinkingHeaderText = isComplete 
+            ? `AI思考过程${allThinkingBlocks.length > 1 ? ` (${i+1})` : ''}` 
+            : `思考中...${allThinkingBlocks.length > 1 ? ` (${i+1})` : ''}`;
+          
+          const thinkingBoxClass = isComplete ? 'thinking-box' : 'thinking-box thinking-in-progress';
+          
+          // 创建思考框HTML - 移除多余的margin和padding，减少最小高度
+          const thinkingBoxHtml = `
+            <div class="${thinkingBoxClass}" style="min-height: ${estimatedHeight}px; transition: none; margin-bottom: 12px;">
+              <div class="thinking-header">
+                <div class="thinking-dot"></div>
+                <div class="thinking-dot"></div>
+                <div class="thinking-dot"></div>
+                <span>${thinkingHeaderText}</span>
+              </div>
+              <div class="thinking-content" style="min-height: ${Math.max(40, estimatedHeight - 40)}px;">
+                ${processedContent}
+                ${!isComplete ? `
+                <div class="typing-indicator">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>` : ''}
+              </div>
+            </div>
+          `;
+          
+          // 替换临时标记
+          processedText = processedText.replace(placeholder, thinkingBoxHtml);
+        }
+        
+        // 检查是否有markdown格式的排盘结果
+        const hasMarkdownBazi = processedText.includes('```markdown') && 
+                            (processedText.includes('八字') || processedText.includes('命盘') || 
+                             processedText.includes('五行') || processedText.includes('生肖'));
+        
+        if (hasMarkdownBazi) {
+          processedText = processedText
+            .replace(/```markdown\n/g, '<div class="markdown-content">')
+            .replace(/\n```/g, '</div>');
+        }
+        
+        // 延迟通知处理完成
+        setTimeout(() => {
+          emits('thinking-processed');
+        }, 500);
+        
+        return sanitizeHtml(processedText);
+      }
+    } catch (e) {
+      console.error('处理多个思考框时出错:', e);
+    }
+  }
+  
+  // 特殊处理：检查是否包含markdown格式的命理内容
+  const hasMarkdownBazi = formatted.includes('```markdown') && 
+                        (formatted.includes('八字') || formatted.includes('命盘') || formatted.includes('五行'));
+  
+  if (hasMarkdownBazi) {
+    try {
+      // 使用特殊处理逻辑处理markdown格式的排盘结果
+      console.log('处理markdown格式的排盘结果');
+      
+      // 如果同时有思考内容，确保不丢失思考内容
+      if (formatted.includes('<details') && formatted.includes('Thinking')) {
+        // 提取思考内容
+        const thinkingCompleteRegex = /<details[^>]*>\s*<summary>\s*Thinking[^<]*<\/summary>([\s\S]*?)<\/details>/i;
+        const thinkingCompleteMatch = formatted.match(thinkingCompleteRegex);
+        
+        if (thinkingCompleteMatch) {
+          // 保留思考内容框，处理缩进
+          const rawThinkingContent = thinkingCompleteMatch[1].trim();
+          const thinkingContent = trimThinkingContent(rawThinkingContent);
+          const estimatedHeight = Math.max(50, Math.min(150, thinkingContent.length / 30));
+          
+          // 提取排盘内容（思考内容之后的所有内容）
+          let afterThinking = formatted.replace(thinkingCompleteRegex, '').trim();
+          
+          // 处理markdown代码块，但保留markdown格式不被转换成代码块
+          afterThinking = afterThinking
+            .replace(/```markdown\n/g, '<div class="markdown-content">')
+            .replace(/\n```/g, '</div>');
+          
+          // 创建组合结果
+          const combinedResult = `
+            <div class="thinking-box" style="min-height: ${estimatedHeight}px; transition: none; margin-bottom: 12px;">
+              <div class="thinking-header">
+                <div class="thinking-dot"></div>
+                <div class="thinking-dot"></div>
+                <div class="thinking-dot"></div>
+                <span>AI思考过程</span>
+              </div>
+              <div class="thinking-content" style="min-height: ${Math.max(40, estimatedHeight - 40)}px;">
+                ${thinkingContent}
+              </div>
+            </div>
+            <div class="result-content">
+              ${afterThinking}
+            </div>
+          `;
+          
+          return sanitizeHtml(combinedResult);
+        }
+      }
+      
+      // 如果没有思考内容，直接处理markdown格式
+      formatted = formatted
+        .replace(/```markdown\n/g, '<div class="markdown-content">')
+        .replace(/\n```/g, '</div>');
+    } catch (e) {
+      console.error('处理markdown命理内容时出错:', e);
+    }
+  }
+  
+  // 处理命理排盘内容 - 识别特定格式和标记
+  if (formatted.includes('八字') || formatted.includes('命盘') || formatted.includes('五行') || formatted.includes('生肖')) {
+    try {
+      // 增强对表格和图表的处理
+      formatted = enhanceAstrologyContent(formatted);
+    } catch (e) {
+      console.error('处理命理内容时出错:', e);
+    }
+  }
+  
   // 特殊处理思考内容 - 包括流式传输中的部分内容
   // 更宽松的正则，可以匹配流式传输中未完成的思考内容
   if (formatted.includes('<details') && formatted.includes('Thinking')) {
@@ -129,23 +419,29 @@ function formatGeneral(text = props.content) {
       // 发出内容处理开始信号
       emits('thinking-processing');
       
-      // 尝试匹配开始的思考标签
-      const thinkingStartMatch = formatted.match(/<details[^>]*>\s*<summary>\s*Thinking[^<]*<\/summary>/i);
+      // 修改：使用更宽松的匹配条件，更早地捕获思考框内容
+      // 尝试匹配开始的思考标签，即使是不完整的
+      const thinkingStartMatch = formatted.match(/<details[^>]*>.*?<summary[^>]*>.*?Thinking/i);
       
       if (thinkingStartMatch) {
-        // 检查是否有完整的思考内容（已结束）
+        // 先检查是否有完整的思考内容（已结束）
         const thinkingCompleteRegex = /<details[^>]*>\s*<summary>\s*Thinking[^<]*<\/summary>([\s\S]*?)<\/details>/i;
         const thinkingCompleteMatch = formatted.match(thinkingCompleteRegex);
         
         // 检查是否有"回答："标记
         const hasAnswer = formatted.includes('回答：') || formatted.includes('回答:');
         
+        // 添加：即使思考内容很短也应该立即处理
+        const partialContentMatch = formatted.match(/<details[^>]*>\s*<summary>\s*Thinking[^<]*<\/summary>([\s\S]*?)(?:<\/details>|$)/i);
+        
+        // 检测到完整思考块
         if (thinkingCompleteMatch && thinkingCompleteMatch[1]) {
-          // 完整思考内容的处理 - 与之前相同
-          const thinkingContent = thinkingCompleteMatch[1].trim();
+          // 完整思考内容的处理，移除多余的空白和缩进
+          const rawThinkingContent = thinkingCompleteMatch[1].trim();
+          const thinkingContent = trimThinkingContent(rawThinkingContent);
           
           // 根据内容长度预先计算最小高度，减少高度变化
-          const estimatedHeight = Math.max(150, Math.min(300, thinkingContent.length / 10));
+          const estimatedHeight = Math.max(50, Math.min(150, thinkingContent.length / 30));
           
           // 创建科技感黑色代码框 - 使用与思考中状态一致的类和结构保持样式连续性
           let newFormatted = `
@@ -156,7 +452,7 @@ function formatGeneral(text = props.content) {
                 <div class="thinking-dot"></div>
                 <span>AI思考过程</span>
               </div>
-              <div class="thinking-content" style="min-height: ${Math.max(80, estimatedHeight - 40)}px;">
+              <div class="thinking-content" style="min-height: ${Math.max(40, estimatedHeight - 40)}px;">
                 ${thinkingContent}
               </div>
             </div>
@@ -183,42 +479,40 @@ function formatGeneral(text = props.content) {
           }, 500); // 增加延迟时间，确保DOM完全稳定
           
           return sanitizeHtml(newFormatted);
-        } else {
-          // 处理流式传输中的部分思考内容
-          // 提取已经传输的部分思考内容
-          const partialContentMatch = formatted.match(/<details[^>]*>\s*<summary>\s*Thinking[^<]*<\/summary>([\s\S]*)/i);
+        } 
+        // 没有完整思考块但有思考内容 - 早期流式思考
+        else if (partialContentMatch && partialContentMatch[1]) {
+          // 处理流式传输中的部分思考内容，处理缩进
+          const rawPartialContent = partialContentMatch[1].trim();
+          const partialThinkingContent = trimThinkingContent(rawPartialContent);
           
-          if (partialContentMatch && partialContentMatch[1]) {
-            const partialThinkingContent = partialContentMatch[1].trim();
-            
-            // 获取内容长度，用于估计需要的高度
-            const contentLength = partialThinkingContent.length;
-            // 设置最小高度，避免高度变化导致的抖动
-            const minHeight = Math.max(150, Math.min(300, contentLength / 6));
-            
-            // 创建科技感黑色代码框，但标记为"思考中..."
-            // 设置固定最小高度以减少高度变化带来的抖动
-            const result = sanitizeHtml(`
-              <div class="thinking-box thinking-in-progress" style="min-height: ${minHeight}px; transform: translateZ(0); transition: none;">
-                <div class="thinking-header">
-                  <div class="thinking-dot"></div>
-                  <div class="thinking-dot"></div>
-                  <div class="thinking-dot"></div>
-                  <span>思考中...</span>
-                </div>
-                <div class="thinking-content" style="min-height: ${Math.max(80, minHeight - 40)}px;">
-                  ${partialThinkingContent}
-                  <div class="typing-indicator">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </div>
+          // 获取内容长度，用于估计需要的高度
+          const contentLength = partialThinkingContent.length;
+          // 设置最小高度，避免高度变化导致的抖动
+          const minHeight = Math.max(50, Math.min(150, contentLength / 30));
+          
+          // 创建科技感黑色代码框，但标记为"思考中..."
+          // 设置固定最小高度以减少高度变化带来的抖动
+          const result = sanitizeHtml(`
+            <div class="thinking-box thinking-in-progress" style="min-height: ${minHeight}px; transform: translateZ(0); transition: none;">
+              <div class="thinking-header">
+                <div class="thinking-dot"></div>
+                <div class="thinking-dot"></div>
+                <div class="thinking-dot"></div>
+                <span>思考中...</span>
+              </div>
+              <div class="thinking-content" style="min-height: ${Math.max(40, minHeight - 40)}px;">
+                ${partialThinkingContent}
+                <div class="typing-indicator">
+                  <span></span>
+                  <span></span>
+                  <span></span>
                 </div>
               </div>
-            `);
-            
-            return result;
-          }
+            </div>
+          `);
+          
+          return result;
         }
       }
       
@@ -232,6 +526,15 @@ function formatGeneral(text = props.content) {
       nextTick(() => {
         emits('thinking-processed');
       });
+    }
+  }
+  
+  // 处理多个代码块的情况
+  if (hasMultipleCodeBlocks.value) {
+    try {
+      formatted = processMultipleCodeBlocks(formatted);
+    } catch (e) {
+      console.error('处理多个代码块出错:', e);
     }
   }
   
@@ -249,12 +552,88 @@ function formatGeneral(text = props.content) {
   // 处理行内代码
   formatted = formatted.replace(/`([^`]+)`/g, '<code class="bg-[#0a0a10] border border-primary/10 px-1.5 py-0.5 rounded text-white font-mono text-xs">$1</code>');
   
-  // 处理换行符和URL
+  // 处理URL而不替换换行符
   formatted = formatted
-    .replace(/\n/g, '<br>')
+    // .replace(/\n/g, '<br>') // 注释掉换行符替换，保留原始的换行符
     .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" class="text-primary hover:underline">$1</a>');
   
   return sanitizeHtml(formatted);
+}
+
+// 增强对命理排盘内容的处理
+function enhanceAstrologyContent(text) {
+  // 如果检测到可能是命理排盘结果
+  let enhanced = text;
+  
+  // 处理可能的表格结构
+  enhanced = enhanced.replace(/\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|/g, '<div class="astrology-table-row"><div>$1</div><div>$2</div></div>');
+  
+  // 处理描述性文本段落
+  enhanced = enhanced.replace(/【([^】]+)】/g, '<div class="astrology-section-title">【$1】</div>');
+  
+  // 处理关键字和年份
+  enhanced = enhanced.replace(/(\d{4})年/g, '<span class="astrology-year">$1年</span>');
+  
+  // 强调五行属性
+  const wuxingElements = ['金', '木', '水', '火', '土'];
+  wuxingElements.forEach(element => {
+    enhanced = enhanced.replace(new RegExp(`${element}命`, 'g'), `<span class="wuxing wuxing-${element}">${element}命</span>`);
+    enhanced = enhanced.replace(new RegExp(`${element}相`, 'g'), `<span class="wuxing wuxing-${element}">${element}相</span>`);
+  });
+  
+  return enhanced;
+}
+
+// 处理多个代码块
+function processMultipleCodeBlocks(text) {
+  // 替换代码块为临时标记，以便后续处理
+  let processed = text;
+  const codeBlocks = [];
+  
+  // 提取所有代码块
+  let match;
+  const codeRegex = /```([a-z]*)\n([\s\S]+?)\n```/g;
+  let index = 0;
+  
+  while ((match = codeRegex.exec(text)) !== null) {
+    const fullMatch = match[0];
+    const language = match[1] || '';
+    const code = match[2] || '';
+    
+    // 存储代码块信息
+    codeBlocks.push({ language, code });
+    
+    // 替换为临时标记
+    const placeholder = `__CODE_BLOCK_${index}__`;
+    processed = processed.replace(fullMatch, placeholder);
+    index++;
+  }
+  
+  // 替换临时标记为HTML格式化后的代码块
+  for (let i = 0; i < codeBlocks.length; i++) {
+    const { language, code } = codeBlocks[i];
+    const placeholder = `__CODE_BLOCK_${i}__`;
+    
+    // 创建代码块HTML
+    const codeHtml = `<div class="code-block-wrapper">
+      <div class="code-header">${language || '代码'}</div>
+      <pre class="language-${language || 'plaintext'}"><code>${escapeHtml(code)}</code></pre>
+    </div>`;
+    
+    processed = processed.replace(placeholder, codeHtml);
+  }
+  
+  return processed;
+}
+
+// HTML转义函数
+function escapeHtml(unsafe) {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 // 净化HTML
@@ -409,8 +788,42 @@ const activateThinkingBoxes = (boxes) => {
             indicator.innerHTML = thinkingBoxOpenState.value[boxId] ? '▼' : '▲';
             header.appendChild(indicator);
             
+            // 添加点击事件到header上
+            header.addEventListener('click', () => {
+              // 切换折叠状态
+              thinkingBoxOpenState.value[boxId] = !thinkingBoxOpenState.value[boxId];
+              
+              // 更新指示器
+              indicator.innerHTML = thinkingBoxOpenState.value[boxId] ? '▼' : '▲';
+              
+              // 切换内容显示状态
+              content.style.display = thinkingBoxOpenState.value[boxId] ? 'block' : 'none';
+              
+              // 调整box的最小高度
+              if (thinkingBoxOpenState.value[boxId]) {
+                // 展开时保持原有高度
+                const contentHeight = content.scrollHeight;
+                // 设置最小高度为内容高度+header高度
+                box.style.minHeight = `${contentHeight + 25}px`;
+              } else {
+                // 折叠时，最小高度仅为header高度
+                box.style.minHeight = '24px';
+              }
+            });
+            
             // 更新内容显示状态
             content.style.display = thinkingBoxOpenState.value[boxId] ? 'block' : 'none';
+            
+            // 调整初始高度
+            if (thinkingBoxOpenState.value[boxId]) {
+              // 确保最小高度不会过高，限制为内容的实际高度
+              setTimeout(() => {
+                const contentHeight = Math.min(150, content.scrollHeight);
+                box.style.minHeight = `${contentHeight + 25}px`;
+              }, 10);
+            } else {
+              box.style.minHeight = '24px';
+            }
           } catch (e) {
             console.error('添加思考框交互元素失败:', e);
           }
@@ -512,6 +925,36 @@ onBeforeUnmount(() => {
     }
   }
 });
+
+// 处理思考框内容的缩进，移除前导空白
+function trimThinkingContent(content) {
+  if (!content) return '';
+  
+  // 移除开头的空白行
+  let trimmed = content.replace(/^\s*\n+/, '');
+  
+  // 检查是否有共同的缩进
+  const lines = trimmed.split('\n');
+  if (lines.length > 1) {
+    // 找出非空行的最小缩进
+    let minIndent = Infinity;
+    lines.forEach(line => {
+      if (line.trim() !== '') {
+        const indent = line.search(/\S|$/);
+        if (indent < minIndent) minIndent = indent;
+      }
+    });
+    
+    // 如果存在共同缩进，移除它
+    if (minIndent > 0 && minIndent < Infinity) {
+      trimmed = lines.map(line => {
+        return line.trim() !== '' ? line.substring(minIndent) : line;
+      }).join('\n');
+    }
+  }
+  
+  return trimmed;
+}
 </script>
 
 <style scoped>
@@ -522,6 +965,11 @@ onBeforeUnmount(() => {
 
 .message-formatter :deep(a:hover) {
   text-decoration: underline;
+}
+
+/* 确保内容正确换行 */
+.content-container {
+  white-space: pre-wrap !important;
 }
 
 .message-formatter :deep(pre) {
@@ -677,32 +1125,32 @@ onBeforeUnmount(() => {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, #6366f1, transparent);
-  animation: thinking-scan 2s linear infinite;
-  z-index: 1;
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.5), transparent);
+  animation: scanline 6s linear infinite; /* 减慢动画速度 */
+  z-index: 20; /* 确保最高层级，高于所有元素 */
+  opacity: 0.7;
 }
 
-/* 思考框样式优化 - 减少动画和频闪 */
+/* 思考框样式优化 - 减少空间占用 */
 .message-formatter :deep(.thinking-box) {
-  margin: 1rem 0;
-  background-color: #0a0a10;
-  border-radius: 0.5rem;
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  margin: 0.3rem 0;
+  background-color: rgba(5, 5, 15, 0.7);
+  border-radius: 0.4rem;
+  border: 1px solid rgba(99, 102, 241, 0.2);
   overflow: hidden;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 0 10px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 5px rgba(99, 102, 241, 0.08);
   position: relative;
   transform: translateZ(0); /* 启用GPU加速 */
   will-change: transform; /* 优化渲染性能 */
+  transition: min-height 0.3s ease;
 }
 
 /* 禁用悬停动画效果，减少可能的频闪 */
 .message-formatter :deep(.thinking-box:hover) {
-  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15), 0 0 15px rgba(99, 102, 241, 0.2);
-  /* 移除transform变换，减少频闪 */
-  /* transform: translateY(-1px); */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15), 0 0 8px rgba(99, 102, 241, 0.15);
 }
 
-/* 减少扫描线动画速度 */
+/* 思考框横条位于最上方 */
 .message-formatter :deep(.thinking-box.thinking-in-progress::before) {
   content: "";
   position: absolute;
@@ -710,47 +1158,49 @@ onBeforeUnmount(() => {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.6), transparent);
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.5), transparent);
   animation: scanline 6s linear infinite; /* 减慢动画速度 */
-  z-index: 1;
+  z-index: 20; /* 确保最高层级，高于所有元素 */
   opacity: 0.7;
 }
 
-/* 思考内容容器 - 减少过渡效果 */
+/* 思考内容容器 - 减少内边距和过渡效果 */
 .message-formatter :deep(.thinking-content) {
-  padding: 1rem;
+  padding: 0.4rem 0.6rem;
   color: #d1d5db;
   font-family: monospace;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  background-color: #0a0a10;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  background-color: rgba(5, 5, 15, 0.8);
   white-space: pre-wrap;
   overflow-x: auto;
   position: relative;
-  /* 移除height和max-height的过渡，减少频闪 */
   transition: none;
-  border-top: 1px dashed rgba(99, 102, 241, 0.2);
+  border-top: 1px dashed rgba(99, 102, 241, 0.15);
   transform: translateZ(0); /* 启用GPU加速 */
 }
 
+/* 调整思考框标题的样式 */
 .message-formatter :deep(.thinking-header) {
   display: flex;
   align-items: center;
-  padding: 0.75rem 1rem;
-  background-color: #131525;
-  border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+  padding: 0.3rem 0.6rem;
+  height: 24px;
+  background-color: rgba(15, 15, 35, 0.9);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.15);
   cursor: pointer;
   user-select: none;
   position: relative;
   transition: background-color 0.2s ease;
-  z-index: 2; /* 确保在scanline之上 */
+  z-index: 2;
 }
 
+/* 减小标题图标大小 */
 .message-formatter :deep(.thinking-dot) {
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  margin-right: 6px;
+  margin-right: 3px;
   transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
@@ -770,20 +1220,22 @@ onBeforeUnmount(() => {
   background-color: #27c93f;
 }
 
+/* 减小标题文字大小 */
 .message-formatter :deep(.thinking-header span) {
-  margin-left: 0.75rem;
-  font-size: 0.75rem;
+  margin-left: 0.4rem;
+  font-size: 0.65rem;
   color: #a3a8c3;
   font-family: monospace;
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
 
+/* 减小折叠指示器大小 */
 .message-formatter :deep(.thinking-toggle) {
   position: absolute;
-  right: 1rem;
+  right: 0.75rem;
   color: #a3a8c3;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   transition: transform 0.3s ease;
 }
 
@@ -795,17 +1247,47 @@ onBeforeUnmount(() => {
   color: #b9bdd7;
 }
 
-/* 添加扫描线动画 */
+/* 减小思考中的打字机指示器大小和间距 */
+.message-formatter :deep(.typing-indicator) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(99, 102, 241, 0.2);
+}
+
+.message-formatter :deep(.typing-indicator span) {
+  width: 5px;
+  height: 5px;
+  margin: 0 2px;
+  background-color: #6366f1;
+  border-radius: 50%;
+  display: inline-block;
+  opacity: 0.4;
+}
+
+.message-formatter :deep(.typing-indicator span:nth-of-type(1)) {
+  animation: typing 1.3s infinite 0.1s;
+}
+
+.message-formatter :deep(.typing-indicator span:nth-of-type(2)) {
+  animation: typing 1.3s infinite 0.2s;
+}
+
+.message-formatter :deep(.typing-indicator span:nth-of-type(3)) {
+  animation: typing 1.3s infinite 0.3s;
+}
+
+/* 动画效果 */
 @keyframes scanline {
   0% {
-    transform: translateY(-100%);
-  }
-  50% {
-    transform: translateY(1500%);
+    transform: translateY(0%);
+    opacity: 0.8;
   }
   100% {
-    transform: translateY(3000%);
-    opacity: 0;
+    transform: translateY(0%);
+    opacity: 0.2;
   }
 }
 
@@ -829,57 +1311,168 @@ onBeforeUnmount(() => {
   }
 }
 
-@keyframes thinking-scan {
-  0% {
-    left: -20%;
-    width: 20%;
-  }
-  100% {
-    left: 100%;
-    width: 20%;
-  }
-}
-
-/* 思考中的打字机指示器 */
-.message-formatter :deep(.typing-indicator) {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed rgba(99, 102, 241, 0.2);
-}
-
-.message-formatter :deep(.typing-indicator span) {
-  width: 6px;
-  height: 6px;
-  margin: 0 2px;
-  background-color: #6366f1;
-  border-radius: 50%;
-  display: inline-block;
-  opacity: 0.4;
-}
-
-.message-formatter :deep(.typing-indicator span:nth-of-type(1)) {
-  animation: typing 1.3s infinite 0.1s;
-}
-
-.message-formatter :deep(.typing-indicator span:nth-of-type(2)) {
-  animation: typing 1.3s infinite 0.2s;
-}
-
-.message-formatter :deep(.typing-indicator span:nth-of-type(3)) {
-  animation: typing 1.3s infinite 0.3s;
-}
-
 @keyframes typing {
   0%, 100% {
     transform: translateY(0);
     opacity: 0.4;
   }
   50% {
-    transform: translateY(-5px);
+    transform: translateY(-3px);
     opacity: 1;
   }
+}
+
+/* 增加命理排盘相关样式 */
+.message-formatter :deep(.astrology-table-row) {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 6px 0;
+  padding: 6px;
+  border-radius: 4px;
+  background-color: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+.message-formatter :deep(.astrology-section-title) {
+  margin: 12px 0 6px;
+  font-weight: 600;
+  color: #6366f1;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+  padding-bottom: 4px;
+}
+
+.message-formatter :deep(.astrology-year) {
+  font-weight: 500;
+  color: #f59e0b;
+}
+
+.message-formatter :deep(.wuxing) {
+  font-weight: 500;
+  padding: 2px 5px;
+  border-radius: 3px;
+  margin: 0 2px;
+}
+
+.message-formatter :deep(.wuxing-金) {
+  background: rgba(255, 215, 0, 0.2);
+  color: #ffb700;
+}
+
+.message-formatter :deep(.wuxing-木) {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.message-formatter :deep(.wuxing-水) {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.message-formatter :deep(.wuxing-火) {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.message-formatter :deep(.wuxing-土) {
+  background: rgba(161, 98, 7, 0.2);
+  color: #b45309;
+}
+
+/* 多代码块处理样式 */
+.message-formatter :deep(.code-block-wrapper) {
+  margin: 12px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0a0a10;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.message-formatter :deep(.code-header) {
+  background: rgba(99, 102, 241, 0.15);
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  color: #a5b4fc;
+  font-family: monospace;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.message-formatter :deep(.code-block-wrapper pre) {
+  margin: 0;
+  padding: 12px;
+  background: transparent;
+  border: none;
+  white-space: pre-wrap;
+}
+
+.message-formatter :deep(.code-block-wrapper code) {
+  background: transparent;
+  padding: 0;
+  border: none;
+  font-size: 0.85rem;
+  color: #e5e7eb;
+}
+
+/* 处理markdown内容的样式 */
+.message-formatter :deep(.markdown-content) {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  margin: 12px 0;
+  padding: 8px 12px;
+  background-color: rgba(99, 102, 241, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(99, 102, 241, 0.1);
+}
+
+.message-formatter :deep(.markdown-content h1),
+.message-formatter :deep(.markdown-content h2),
+.message-formatter :deep(.markdown-content h3) {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  color: #a5b4fc;
+}
+
+.message-formatter :deep(.markdown-content ul),
+.message-formatter :deep(.markdown-content ol) {
+  margin-left: 20px;
+  margin-bottom: 12px;
+}
+
+.message-formatter :deep(.markdown-content li) {
+  margin-bottom: 4px;
+}
+
+.message-formatter :deep(.markdown-content table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+}
+
+.message-formatter :deep(.markdown-content th),
+.message-formatter :deep(.markdown-content td) {
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  padding: 6px 10px;
+}
+
+.message-formatter :deep(.markdown-content th) {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.message-formatter :deep(.result-content) {
+  margin-top: 16px;
+}
+
+.allow-copy {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  cursor: text;
+}
+
+.allow-copy * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
 }
 </style> 

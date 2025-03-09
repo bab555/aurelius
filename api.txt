@@ -1008,3 +1008,21 @@ icon (object|string)
 background (string) hex格式的背景色
 content(string) emoji
 (string) 图标URL
+Request
+POST
+/meta
+curl -X GET 'http://127.0.0.1/v1/meta' \
+-H 'Authorization: Bearer {api_key}'
+
+Copy
+Copied!
+Response
+{
+  "tool_icons": {
+      "dalle2": "https://cloud.dify.ai/console/api/workspaces/current/tool-provider/builtin/dalle/icon",
+      "api_tool": {
+          "background": "#252525",
+          "content": "😁"
+      }
+  }
+}

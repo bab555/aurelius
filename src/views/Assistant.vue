@@ -1,5 +1,10 @@
 <template>
   <div class="flex-1 flex flex-col relative h-screen">
+    <!-- 组件加载指示器 -->
+    <div v-if="!isComponentReady" class="absolute inset-0 flex items-center justify-center bg-[#0e0b36]/80 z-10">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+    </div>
+    
     <div class="p-4 md:p-8 flex flex-col h-full">
       <!-- 页面标题 -->
       <div class="mb-6 flex-shrink-0">
@@ -122,13 +127,14 @@
       <!-- 底部输入区域 -->
       <div class="mt-4 flex-shrink-0">
         <div class="relative">
-          <textarea 
-            v-model="userInput" 
+          <textarea
+            v-model="userInput"
             @keydown.enter.prevent="sendMessage"
             placeholder="输入您的问题..." 
             class="bg-gray-900 border border-gray-700 rounded-xl text-white p-4 pr-12 w-full focus:outline-none focus:border-primary"
             rows="1"
             ref="textareaRef"
+            :disabled="isLoading || isInputDisabled"
           ></textarea>
           <button 
             @click="sendMessage" 
@@ -149,16 +155,32 @@
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useChatStore } from '../stores/chat'
 import MessageFormatter from '../components/MessageFormatter.vue'
+import * as swManager from '../services/swManager'
+import * as chatAPI from '../services/chatAPI'
+import { useRouter } from 'vue-router'
 
 // 使用聊天状态存储
 const chatStore = useChatStore()
+const router = useRouter()
+
+// 中间层同步状态
+const syncedWithMiddleLayer = ref(false)
+
+// 组件就绪状态
+const isComponentReady = ref(false)
 
 // DOM引用
 const chatContainer = ref(null)
 const textareaRef = ref(null)
+const messagesContainer = ref(null)
+const scrollContainer = ref(null)
+const observer = ref(null)
+const scrollDebounceTimer = ref(null)
 
 // 用户输入
 const userInput = ref('')
+const isLoading = ref(false)
+const isInputDisabled = ref(false) // 控制输入框是否禁用
 
 // 对话建议
 const suggestions = [
@@ -182,12 +204,10 @@ const adjustTextareaHeight = () => {
 watch(userInput, adjustTextareaHeight)
 
 // 计算属性
-const isLoading = computed(() => chatStore.isLoading)
 const messages = computed(() => chatStore.sortedMessages)
 
 // 简化滚动逻辑，专注于用户体验
 const autoScrollEnabled = ref(true); // 默认启用自动滚动
-const scrollDebounceTimer = ref(null);
 const isUserScrolling = ref(false);
 const lastScrollTime = ref(0);
 
@@ -269,7 +289,7 @@ const setupScrollSystem = () => {
   };
   
   // 创建MutationObserver监听消息区域DOM变化
-  const observer = new MutationObserver(() => {
+  observer.value = new MutationObserver(() => {
     // 防抖处理
     clearTimeout(scrollDebounceTimer.value);
     scrollDebounceTimer.value = setTimeout(() => {
@@ -278,16 +298,10 @@ const setupScrollSystem = () => {
   });
   
   // 开始观察变化
-  observer.observe(chatContainer.value, {
+  observer.value.observe(chatContainer.value, {
     childList: true,
     subtree: true,
     characterData: true
-  });
-  
-  // 组件卸载时清理
-  onBeforeUnmount(() => {
-    observer.disconnect();
-    clearTimeout(scrollDebounceTimer.value);
   });
 };
 
@@ -321,31 +335,107 @@ watch(() => messages.value.length, (newCount, oldCount) => {
 
 // 发送消息
 const sendMessage = async () => {
-  const content = userInput.value.trim();
-  if (!content || isLoading.value) return;
+  // 获取输入框内容并清空
+  const content = userInput.value.trim()
+  if (!content || isLoading.value) return
   
   // 清空输入框
-  userInput.value = '';
-  adjustTextareaHeight();
+  userInput.value = ''
+  adjustTextareaHeight()
   
   try {
-    // 重新启用自动滚动
-    autoScrollEnabled.value = true;
+    // 检查并修复可能错误的状态
+    if (chatStore.isLoading || chatStore.isStreaming || chatStore.isGenerating) {
+      console.warn('检测到不一致的状态，尝试自动修复');
+      
+      // 修正所有流式消息的状态
+      chatStore.messages.forEach(msg => {
+        if (msg.isStreaming) {
+          msg.isStreaming = false;
+          msg.content += '\n\n[系统自动修复：此消息在开始新对话前已标记为已完成]';
+        }
+      });
+      
+      // 强制重置所有状态变量
+      chatStore.isLoading = false;
+      chatStore.isStreaming = false;
+      chatStore.isGenerating = false;
+      chatStore.currentTask = null;
+    }
     
-    // 先滚动到底部确保用户可以看到自己的消息
-    scrollToBottom(true);
+    // 重新启用自动滚动
+    autoScrollEnabled.value = true
+    
+    // 先滚动到底部
+    scrollToBottom(true)
+    
+    // 如果使用中间层且当前会话已存在，需要确保同步状态
+    if (chatStore.isUsingMiddleLayer && chatStore.currentConversationId) {
+      // 首次发送消息时与中间层同步
+      if (!syncedWithMiddleLayer.value) {
+        try {
+          console.log('首次同步会话到中间层:', chatStore.currentConversationId)
+          await syncWithMiddleLayer()
+        } catch (e) {
+          console.warn('同步到中间层失败:', e)
+          // 继续发送消息，即使同步失败
+        }
+      } else if (syncedWithMiddleLayer.value) {
+        // 如果会话已标记为完成，尝试继续会话
+        console.log('检查是否需要继续已完成的会话')
+        try {
+          await swManager.continueSession(chatStore.currentConversationId)
+        } catch (e) {
+          console.warn('继续会话失败，将尝试发送消息:', e)
+          // 继续执行，即使继续会话失败
+        }
+      }
+    }
     
     // 发送消息到API
-    await chatStore.sendMessage(content);
+    await chatStore.sendMessage(content)
     
-    // 消息发送后再次滚动
+    // 消息发送成功，保存会话ID并同步
+    if (chatStore.currentConversationId) {
+      sessionStorage.setItem('travel_conversation_id', chatStore.currentConversationId)
+      
+      // 如果是使用中间层且首次同步
+      if (chatStore.isUsingMiddleLayer && !syncedWithMiddleLayer.value) {
+        console.log('消息发送成功，首次同步会话到中间层', chatStore.currentConversationId)
+        await syncWithMiddleLayer()
+      }
+    }
+    
+    // 消息发送后再次滚动到底部
     setTimeout(() => {
-      scrollToBottom(true);
-    }, 100);
+      scrollToBottom(true)
+    }, 100)
   } catch (e) {
-    console.error('发送消息失败:', e);
+    console.error('发送消息失败:', e)
+    
+    // 如果是会话不存在错误，则清理会话ID
+    if (e.message && e.message.includes('Conversation Not Exists')) {
+      console.warn('会话不存在，清理会话ID')
+      await cleanupSession()
+    }
+    
+    // 显示错误消息给用户
+    messages.value.push({
+      id: crypto.randomUUID(),
+      conversation_id: chatStore.currentConversationId || '',
+      role: 'assistant',
+      content: `⚠️ 消息发送失败：${e.message || '网络连接错误'}`,
+      created_at: Date.now() / 1000,
+      isError: true
+    });
+    
+    // 尝试自动恢复输入内容
+    if (content && !userInput.value) {
+      userInput.value = content;
+      adjustTextareaHeight();
+    }
   }
-};
+}
 
 // 开始以建议开始对话
 const startConversation = (suggestion) => {
@@ -358,8 +448,9 @@ const formatMessage = (content) => {
   if (!content) return ''
   
   try {
-    // 替换换行符为<br>
-    let formatted = content.replace(/\n/g, '<br>')
+    // 保留原始换行符，不做替换
+    // let formatted = content.replace(/\n/g, '<br>')
+    let formatted = content
     
     // 将URL转换为可点击的链接
     formatted = formatted.replace(
@@ -367,10 +458,11 @@ const formatMessage = (content) => {
       '<a href="$1" target="_blank" class="text-primary hover:underline">$1</a>'
     )
     
-    // 先处理完整的details标签
-    if (formatted.includes('<details>') && formatted.includes('</details>')) {
+    // 先处理完整的details标签，但跳过已处理的思考框
+    if (formatted.includes('<details>') && formatted.includes('</details>') && !formatted.includes('class="thinking-box"')) {
       try {
-        const detailsPattern = /<details>([\s\S]*?)<summary>([\s\S]*?)<\/summary>([\s\S]*?)<\/details>/g;
+        // 跳过思考框内容，仅处理其他details
+        const detailsPattern = /<details>([\s\S]*?)<summary>(?!Thinking)([\s\S]*?)<\/summary>([\s\S]*?)<\/details>/g;
         formatted = formatted.replace(detailsPattern, 
           '<details class="my-3 bg-[#070620] rounded-lg overflow-hidden border border-primary/10"><summary class="p-3 cursor-pointer text-gray-300 font-medium hover:bg-[#0a0830] transition-colors">$2</summary><div class="p-3 border-t border-primary/10 bg-[#080722] text-gray-300">$3</div></details>');
       } catch (e) {
@@ -379,8 +471,8 @@ const formatMessage = (content) => {
     }
     
     // 处理不完整的details和summary标签
-    if (formatted.includes('<details>') && !formatted.includes('</details>')) {
-      formatted = formatted.replace(/<details>([\s\S]*)$/, 
+    if (formatted.includes('<details>') && !formatted.includes('</details>') && !formatted.includes('class="thinking-box"')) {
+      formatted = formatted.replace(/<details>(?![\s\S]*?Thinking)([\s\S]*)$/, 
         '<div class="bg-[#070620] rounded-lg p-3 border border-primary/10 text-gray-300">$1</div>');
     }
     
@@ -402,7 +494,7 @@ const formatMessage = (content) => {
     )
     
     // 最后将换行符替换为<br>
-    formatted = formatted.replace(/\n/g, '<br>')
+    // formatted = formatted.replace(/\n/g, '<br>')
     
     // 将URL转换为可点击的链接
     formatted = formatted.replace(
@@ -422,40 +514,327 @@ const testConnection = async () => {
   await chatStore.checkConnection()
 }
 
+// 生命周期钩子注册 - 提前注册所有钩子
+onBeforeUnmount(() => {
+  try {
+    // 如果有活跃会话且使用中间层，标记会话完成
+    if (chatStore.isUsingMiddleLayer && chatStore.currentConversationId && syncedWithMiddleLayer.value) {
+      try {
+        console.log('文旅助手页面卸载，标记会话完成并清理资源', chatStore.currentConversationId);
+        swManager.completeSession(chatStore.currentConversationId);
+        swManager.clearSession(chatStore.currentConversationId);
+      } catch (error) {
+        console.error('标记会话完成失败:', error);
+      }
+    }
+    
+    // 移除事件监听器
+    window.removeEventListener('focus', handleWindowFocus);
+    window.removeEventListener('blur', handleWindowBlur);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    
+    // 保存会话ID到sessionStorage
+    if (chatStore.currentConversationId) {
+      sessionStorage.setItem('travel_conversation_id', chatStore.currentConversationId);
+    }
+  } catch (error) {
+    console.error('组件卸载清理失败:', error);
+  }
+});
+
 // 页面加载时初始化
 onMounted(async () => {
   try {
     // 初始化聊天状态
-    await chatStore.initialize()
+    await chatStore.initialize(chatAPI.APP_TYPES.TRAVEL);
     
     // 检查API连接状态
-    await chatStore.checkConnection()
+    await chatStore.checkConnection();
     
-    // 创建新会话
-    chatStore.createNewConversation()
+    // 恢复会话流程
+    let sessionLoaded = false;
+    
+    // 尝试从sessionStorage中恢复会话ID
+    const sessionId = sessionStorage.getItem('travel_conversation_id');
+    
+    if (sessionId) {
+      // 验证会话ID格式
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidPattern.test(sessionId)) {
+        console.log('从sessionStorage恢复会话:', sessionId);
+        
+        try {
+          // 尝试切换到该会话，这会重置所有状态变量
+          await chatStore.switchConversation(sessionId);
+          
+          // 标记会话已加载
+          sessionLoaded = true;
+          
+          // 尝试从中间层恢复会话中的消息
+          if (chatStore.isUsingMiddleLayer) {
+            try {
+              const restored = await chatStore.tryRestoreSessionFromMiddleLayer();
+              if (restored) {
+                console.log('成功从中间层恢复会话消息');
+                syncedWithMiddleLayer.value = true;
+                
+                // 检查所有消息，确保没有处于流式状态的
+                chatStore.messages.forEach(msg => {
+                  if (msg.isStreaming) {
+                    msg.isStreaming = false;
+                    msg.content += '\n\n[此消息在页面加载时已自动标记为已完成]';
+                    console.log('检测到流式消息，已标记为完成');
+                  }
+                });
+              } else {
+                // 同步到中间层
+                await syncWithMiddleLayer();
+              }
+            } catch (e) {
+              console.warn('从中间层恢复会话失败:', e);
+            }
+          }
+          
+          // 强制重置所有状态变量，确保不会处于"对话中"状态
+          chatStore.isLoading = false;
+          chatStore.isStreaming = false;
+          chatStore.isGenerating = false;
+          chatStore.currentTask = null;
+          
+          console.log('会话恢复完成，状态已重置');
+        } catch (error) {
+          console.warn('恢复会话失败:', error);
+          
+          // 如果是会话不存在错误，则清理会话ID
+          if (error.message && error.message.includes('Conversation Not Exists')) {
+            await cleanupSession();
+            sessionLoaded = false;
+          }
+        }
+      } else {
+        console.warn('会话ID格式不正确:', sessionId);
+        sessionStorage.removeItem('travel_conversation_id');
+      }
+    }
+    
+    // 如果没有恢复到有效会话，则准备新会话环境
+    if (!sessionLoaded) {
+      console.log('准备新对话环境');
+      
+      // 设置应用类型
+      chatStore.setAppType(chatAPI.APP_TYPES.TRAVEL);
+      
+      // 清除当前会话ID
+      chatStore.currentConversationId = '';
+      
+      // 重置同步状态
+      syncedWithMiddleLayer.value = false;
+      
+      // 确保所有状态变量重置
+      chatStore.isLoading = false;
+      chatStore.isStreaming = false;
+      chatStore.isGenerating = false;
+      chatStore.currentTask = null;
+    }
+    
+    // 添加页面可见性变更监听
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     // 设置滚动系统
     nextTick(() => {
       setupScrollSystem();
       
       // 初始滚动到底部
-      scrollToBottom(true);
+      if (chatStore.messages.length > 0) {
+        scrollToBottom(true);
+      }
     });
-  } catch (e) {
-    console.error('Assistant初始化失败:', e);
+    
+    // 标记组件为已就绪
+    isComponentReady.value = true;
+  } catch (error) {
+    console.error('初始化组件失败:', error);
+    isComponentReady.value = true; // 即使失败也设置为就绪，允许用户操作
   }
-})
-
-// 组件卸载时清理资源
-onBeforeUnmount(() => {
-  clearTimeout(scrollDebounceTimer.value);
 });
+
+// 处理会话被其他标签页替换的情况
+const handleSessionReplaced = (event) => {
+  const { oldSessionId, newSessionId } = event.detail;
+  
+  // 检查是否是当前会话被替换
+  if (chatStore.currentConversationId === oldSessionId) {
+    console.warn('检测到当前会话已在其他标签页中打开，本页面将不再响应');
+    
+    // 显示提示给用户
+    messages.value.push({
+      id: crypto.randomUUID(),
+      conversation_id: chatStore.currentConversationId,
+      role: 'assistant',
+      content: '⚠️ 检测到您已在其他标签页中打开了文旅助手。为避免冲突，本页面将不再响应。',
+      created_at: Date.now() / 1000,
+      isError: true
+    });
+    
+    // 禁用输入
+    isInputDisabled.value = true;
+  }
+};
+
+// 同步到中间层的辅助函数
+const syncWithMiddleLayer = async () => {
+  try {
+    if (!chatStore.isUsingMiddleLayer || !chatStore.currentConversationId) {
+      return;
+    }
+    
+    // 注册会话到中间层
+    await swManager.registerSession(chatStore.currentConversationId, {
+      type: 'travel-assistant',
+      name: '文旅助手',
+      description: '丽水云和县智能AI导游',
+      created_at: Date.now()
+    });
+    
+    // 更新会话数据
+    await swManager.updateSession(chatStore.currentConversationId, {
+      messages: chatStore.sortedMessages,
+      last_updated: Date.now()
+    });
+    
+    // 添加会话监听器
+    swManager.addSessionListener(chatStore.currentConversationId, handleSessionUpdate);
+    
+    // 标记为已同步
+    syncedWithMiddleLayer.value = true;
+    console.log('会话已成功同步到中间层:', chatStore.currentConversationId);
+  } catch (error) {
+    console.error('同步到中间层失败:', error);
+    // 继续操作，即使同步失败
+  }
+};
+
+// 清理会话的辅助函数
+const cleanupSession = async () => {
+  try {
+    const oldId = chatStore.currentConversationId;
+    
+    // 如果使用中间层且有会话ID，清理中间层
+    if (chatStore.isUsingMiddleLayer && oldId) {
+      try {
+        await swManager.clearSession(oldId);
+        console.log('已清理中间层会话:', oldId);
+      } catch (e) {
+        console.warn('清理中间层会话失败:', e);
+      }
+    }
+    
+    // 清除当前会话ID
+    chatStore.currentConversationId = '';
+    sessionStorage.removeItem('travel_conversation_id');
+    
+    // 重置同步状态
+    syncedWithMiddleLayer.value = false;
+    
+    console.log('会话已清理，准备重新开始对话');
+  } catch (error) {
+    console.error('清理会话失败:', error);
+  }
+};
+
+// 处理会话更新的辅助函数
+const handleSessionUpdate = (event) => {
+  console.log('接收到中间层会话更新:', event);
+  // 可以在这里添加处理会话更新的逻辑
+};
+
+// 处理页面可见性变更
+const handleVisibilityChange = async () => {
+  if (document.visibilityState === 'visible') {
+    // 页面变为可见时
+    console.log('文旅助手页面恢复可见');
+    
+    // 如果有当前会话ID，检查会话是否仍然有效
+    if (chatStore.currentConversationId) {
+      try {
+        // 检查会话是否存在于sessionStorage中
+        const storedId = sessionStorage.getItem('travel_conversation_id');
+        
+        if (storedId !== chatStore.currentConversationId) {
+          console.log('会话ID不匹配，更新到sessionStorage', {
+            stored: storedId,
+            current: chatStore.currentConversationId
+          });
+          sessionStorage.setItem('travel_conversation_id', chatStore.currentConversationId);
+        }
+        
+        // 检查是否有处于流式状态的消息
+        const hasStreamingMessage = chatStore.messages.some(msg => msg.isStreaming);
+        
+        if (hasStreamingMessage) {
+          console.log('检测到有流式消息，页面切换回来时自动标记为完成');
+          
+          // 修正所有流式消息的状态
+          chatStore.messages.forEach(msg => {
+            if (msg.isStreaming) {
+              msg.isStreaming = false;
+              msg.content += '\n\n[此消息在页面切换回时已自动标记为已完成]';
+            }
+          });
+          
+          // 强制重置所有状态变量
+          chatStore.isLoading = false;
+          chatStore.isStreaming = false;
+          chatStore.isGenerating = false;
+          chatStore.currentTask = null;
+        }
+        
+        // 如果使用中间层，检查会话是否同步
+        if (chatStore.isUsingMiddleLayer && !syncedWithMiddleLayer.value) {
+          await syncWithMiddleLayer();
+        }
+      } catch (error) {
+        console.warn('页面恢复可见时同步会话状态失败:', error);
+      }
+    }
+    
+    // 重新检查API连接状态
+    try {
+      await chatStore.checkConnection();
+    } catch (e) {
+      console.warn('检查API连接状态失败:', e);
+    }
+  } else if (document.visibilityState === 'hidden') {
+    // 页面隐藏时，确保会话ID被保存
+    if (chatStore.currentConversationId) {
+      console.log('文旅助手页面隐藏，保存会话状态');
+      sessionStorage.setItem('travel_conversation_id', chatStore.currentConversationId);
+      
+      // 如果使用中间层，确保最新状态已同步
+      if (chatStore.isUsingMiddleLayer && syncedWithMiddleLayer.value) {
+        try {
+          await swManager.updateSession(chatStore.currentConversationId, {
+            messages: chatStore.sortedMessages,
+            last_updated: Date.now()
+          });
+        } catch (error) {
+          console.warn('页面隐藏时同步到中间层失败:', error);
+        }
+      }
+    }
+  }
+};
 </script>
 
 <style scoped>
 /* 聊天相关样式 */
 .message-container:last-child {
   margin-bottom: 10px;
+}
+
+/* 确保文本正确换行的关键样式 */
+.text-gray-200 {
+  white-space: pre-wrap !important;
 }
 
 /* 自定义滚动条样式 */

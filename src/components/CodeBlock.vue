@@ -18,6 +18,7 @@ import bash from 'highlight.js/lib/languages/bash';
 import json from 'highlight.js/lib/languages/json';
 import xml from 'highlight.js/lib/languages/xml';
 import css from 'highlight.js/lib/languages/css';
+import markdown from 'highlight.js/lib/languages/markdown';
 import 'highlight.js/styles/atom-one-dark.css';
 
 // 注册语言
@@ -31,6 +32,8 @@ hljs.registerLanguage('json', json);
 hljs.registerLanguage('html', xml);
 hljs.registerLanguage('xml', xml);
 hljs.registerLanguage('css', css);
+hljs.registerLanguage('markdown', markdown);
+hljs.registerLanguage('md', markdown);
 
 const props = defineProps({
   code: {
@@ -48,11 +51,26 @@ const highlightedCode = computed(() => {
   
   try {
     if (props.language) {
+      // 特殊处理markdown - 避免嵌套markdown内容导致的问题
+      if (props.language === 'markdown' || props.language === 'md') {
+        // 对markdown内容进行安全处理，避免渲染问题
+        return escapeHtml(props.code);
+      }
+      
+      // 其他语言正常高亮
       return hljs.highlight(props.code, { language: props.language }).value;
     }
-    return hljs.highlightAuto(props.code).value;
+    
+    // 自动检测语言
+    try {
+      return hljs.highlightAuto(props.code).value;
+    } catch (autoError) {
+      console.warn('自动语言检测失败，降级为普通显示', autoError);
+      return escapeHtml(props.code);
+    }
   } catch (error) {
     console.error('代码高亮失败:', error);
+    // 发生错误时，返回安全转义的代码
     return escapeHtml(props.code);
   }
 });

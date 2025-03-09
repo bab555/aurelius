@@ -14,6 +14,7 @@ export default defineConfig({
   server: {
     fs: {
       allow: ['ui', '.', 'src']
-    }
+    },
+    allowedHosts: ['test000.natapp1.cc']
   }
 }) 
