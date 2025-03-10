@@ -154,6 +154,10 @@ const emits = defineEmits(['thinking-processing', 'thinking-processed']);
 
 // 通用格式化
 function formatGeneral(text = props.content) {
+  console.log('[MessageFormatter] 开始格式化消息，内容长度:', (text || '').length, 
+    '内容开头:', text?.substring(0, 30).replace(/\n/g, '\\n') || '',
+    '主机名:', window.location.hostname);
+  
   let formatted = text || ''; // 确保text不是null或undefined
   
   // 处理多个思考框（双模型叠加作业）

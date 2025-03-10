@@ -5,12 +5,15 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // 定义应用类型枚举
 export const APP_TYPES = {
-  TRAVEL: 'travel',       // 文旅助手
-  DESTINY: 'destiny',     // 命理算命
+  TRAVEL: 'travel',           // 文旅助手
+  DESTINY: 'destiny',         // 命理算命
+  INTELLIGENT: 'intelligent', // 智能助手
+  SOLUTION: 'solution',       // 方案助手
+  ENTERPRISE: 'enterprise',   // 企业助手
   // 后续可以添加更多应用类型
-  IMAGE: 'image',         // 图像生成
-  VOICE: 'voice',         // 语音合成
-  VIDEO: 'video',         // 视频生成
+  IMAGE: 'image',             // 图像生成
+  VOICE: 'voice',             // 语音合成
+  VIDEO: 'video',             // 视频生成
 };
 
 // 根据应用类型获取对应的API凭证
@@ -20,6 +23,21 @@ export const getCredentials = (appType = APP_TYPES.TRAVEL) => {
       return {
         appId: import.meta.env.VITE_DESTINY_APP_ID,
         apiKey: import.meta.env.VITE_DESTINY_API_KEY
+      };
+    case APP_TYPES.INTELLIGENT:
+      return {
+        appId: import.meta.env.VITE_INTELLIGENT_APP_ID,
+        apiKey: import.meta.env.VITE_INTELLIGENT_API_KEY
+      };
+    case APP_TYPES.SOLUTION:
+      return {
+        appId: import.meta.env.VITE_SOLUTION_APP_ID,
+        apiKey: import.meta.env.VITE_SOLUTION_API_KEY
+      };
+    case APP_TYPES.ENTERPRISE:
+      return {
+        appId: import.meta.env.VITE_ENTERPRISE_APP_ID,
+        apiKey: import.meta.env.VITE_ENTERPRISE_API_KEY
       };
     case APP_TYPES.IMAGE:
       // 预留图像生成API凭证

@@ -126,19 +126,24 @@
 
       <!-- 底部输入区域 -->
       <div class="mt-4 flex-shrink-0">
-        <div class="relative">
-          <textarea
-            v-model="userInput"
-            @keydown.enter.prevent="sendMessage"
-            placeholder="输入您的问题..." 
-            class="bg-gray-900 border border-gray-700 rounded-xl text-white p-4 pr-12 w-full focus:outline-none focus:border-primary"
-            rows="1"
-            ref="textareaRef"
-            :disabled="isLoading || isInputDisabled"
-          ></textarea>
+        <div class="flex items-center space-x-2">
+          <!-- 输入框 -->
+          <div class="relative flex-1">
+            <textarea
+              v-model="userInput"
+              @keydown.enter.prevent="sendMessage"
+              placeholder="输入您的问题..." 
+              class="bg-gray-900 border border-gray-700 rounded-lg text-white p-3 w-full focus:outline-none focus:border-primary resize-none"
+              rows="1"
+              ref="textareaRef"
+              :disabled="isLoading || isInputDisabled"
+            ></textarea>
+          </div>
+          
+          <!-- 发送按钮 -->
           <button 
             @click="sendMessage" 
-            class="absolute right-3 bottom-3 w-8 h-8 bg-primary rounded-lg flex items-center justify-center"
+            class="h-[42px] w-10 bg-primary rounded-lg flex items-center justify-center flex-shrink-0"
             :disabled="isLoading || !userInput.trim()"
             :class="{'opacity-50 cursor-not-allowed': isLoading || !userInput.trim()}"
           >
@@ -569,6 +574,79 @@ onMounted(async () => {
           
           // 标记会话已加载
           sessionLoaded = true;
+          
+          // 直接从后端获取历史消息，确保消息始终能显示
+          console.log('直接从后端获取历史消息');
+          await chatStore.fetchMessages(sessionId);
+          console.log('获取消息完成，消息数量:', chatStore.messages.length);
+          
+          // 记录所有消息的基本信息，帮助调试
+          console.log('[详细日志] 消息内容概览:', chatStore.messages.map(msg => ({
+            id: msg.id.substring(0, 8), // 只显示ID前8位
+            role: msg.role,
+            length: msg.content?.length || 0,
+            preview: msg.content?.substring(0, 30).replace(/\n/g, '\\n') || '',
+            isStreaming: msg.isStreaming
+          })));
+          
+          // 添加详细的消息格式检查
+          if (chatStore.messages.length > 0) {
+            console.log('[详细检查] 第一条消息完整信息:', {
+              id: chatStore.messages[0].id,
+              role: chatStore.messages[0].role,
+              content: chatStore.messages[0].content?.substring(0, 50),
+              isUser: chatStore.messages[0].role === 'user',
+              isAssistant: chatStore.messages[0].role === 'assistant'
+            });
+            
+            // 检查是否有assistant角色的消息
+            const hasAssistantMsg = chatStore.messages.some(msg => msg.role === 'assistant');
+            console.log('[详细检查] 是否包含AI消息:', hasAssistantMsg);
+            
+            // 检查渲染条件
+            const msgElement = document.querySelector('.flex.items-start');
+            if (msgElement) {
+              console.log('[详细检查] 第一条消息DOM:', msgElement.innerHTML.substring(0, 200));
+            }
+          }
+          
+          // 输出计算属性messages的当前状态
+          console.log('[详细日志] 计算属性messages当前长度:', messages.value.length);
+          
+          // 输出DOM状态
+          setTimeout(() => {
+            const messageElements = document.querySelectorAll('.flex.items-start');
+            console.log('[详细日志] 实际渲染的消息元素数量:', messageElements.length);
+            
+            // 检查消息容器是否存在
+            const container = document.querySelector('.space-y-6.pb-4');
+            console.log('[详细日志] 消息容器存在:', !!container, container);
+            
+            // 检查消息格式化组件
+            const formatters = document.querySelectorAll('message-formatter');
+            console.log('[详细日志] 消息格式化组件数量(message-formatter):', formatters.length);
+          }, 500);
+          
+          // 确保视图更新
+          if (chatStore.messages.length === 0) {
+            console.log('未检测到历史消息，添加临时测试消息');
+            // 如果没有消息，添加一条测试消息以便调试
+            chatStore.messages.push({
+              id: crypto.randomUUID(),
+              conversation_id: sessionId,
+              role: 'assistant',
+              content: '⚠️ 系统提示：检测到会话恢复异常，这是一条测试消息。请忽略此消息并尝试继续对话或刷新页面。',
+              created_at: Date.now() / 1000
+            });
+          } else {
+            console.log('检测到历史消息，强制刷新视图');
+            // 使用临时变量克隆消息数组，确保引用变化触发视图更新
+            const tempMessages = [...chatStore.messages];
+            chatStore.messages = [];
+            setTimeout(() => {
+              chatStore.messages = tempMessages;
+            }, 10);
+          }
           
           // 尝试从中间层恢复会话中的消息
           if (chatStore.isUsingMiddleLayer) {

@@ -40,7 +40,10 @@ export const useChatStore = defineStore('chat', () => {
   
   // 计算属性
   const sortedMessages = computed(() => {
-    return [...messages.value].sort((a, b) => a.created_at - b.created_at);
+    console.log('[详细日志] sortedMessages计算属性执行，原始消息数量:', messages.value.length, '主机名:', window.location.hostname);
+    const sorted = [...messages.value].sort((a, b) => a.created_at - b.created_at);
+    console.log('[详细日志] sortedMessages计算完成，排序后消息数量:', sorted.length);
+    return sorted;
   });
   
   // 添加调试日志功能
@@ -162,10 +165,27 @@ export const useChatStore = defineStore('chat', () => {
   
   // 方法
   // 发送消息
-  const sendMessage = async (content, files = [], inputs = {}) => {
+  const sendMessage = async (content, fileInfo = null, inputs = {}) => {
     if (isLoading.value) return;
     
-    logDebug('准备发送消息', { content, hasFiles: files.length > 0 });
+    // 处理文件信息
+    let files = [];
+    if (fileInfo) {
+      logDebug('准备发送带文件的消息', { 
+        content, 
+        fileId: fileInfo.fileId,
+        fileName: fileInfo.fileName 
+      });
+      
+      // 构建文件对象
+      files.push({
+        id: fileInfo.fileId,
+        name: fileInfo.fileName,
+        isUrl: false
+      });
+    } else {
+      logDebug('准备发送消息', { content, hasFiles: false });
+    }
     
     const userMessage = {
       id: uuidv4(),
@@ -212,7 +232,7 @@ export const useChatStore = defineStore('chat', () => {
     try {
       // 准备文件格式
       const apiFiles = files.map(file => ({
-        type: file.type.startsWith('image/') ? 'image' : 'document',
+        type: 'document', // 默认为文档类型
         transfer_method: file.isUrl ? 'remote_url' : 'local_file',
         ...(file.isUrl ? { url: file.url } : { upload_file_id: file.id })
       }));
@@ -386,6 +406,7 @@ export const useChatStore = defineStore('chat', () => {
     }
     
     try {
+      console.log('[详细日志] 开始获取消息，会话ID:', targetId, '应用类型:', currentAppType.value, '主机名:', window.location.hostname);
       isLoading.value = true;
       
       // 获取会话消息 - 使用当前应用类型
@@ -399,32 +420,90 @@ export const useChatStore = defineStore('chat', () => {
       
       // 处理响应
       if (response && response.data) {
+        console.log('[详细日志] 获取消息成功，消息数量:', response.data.length, '首条消息结构:', 
+          JSON.stringify(response.data[0] ? {
+            id: response.data[0].id,
+            query: response.data[0].query?.substring(0, 30),
+            answer: response.data[0].answer?.substring(0, 30),
+            role: response.data[0].role,
+            content: response.data[0].content?.substring(0, 30)
+          } : 'no messages'));
+        
         // 如果获取的是当前会话的消息，则更新消息列表
         if (targetId === currentConversationId.value) {
           // 转换消息格式并更新本地消息列表
-          const formattedMessages = response.data.map(msg => ({
-            id: msg.id,
-            conversation_id: msg.conversation_id,
-            role: msg.role,
-            content: msg.content || '',
-            created_at: msg.created_at ? new Date(msg.created_at).getTime() / 1000 : Date.now() / 1000,
-            isComplete: true,
-            isStreaming: false // 确保从服务器恢复的消息不会处于流状态
-          }));
+          const formattedMessages = [];
+          
+          response.data.forEach(msg => {
+            // 检查是否新格式（包含query和answer字段）或旧格式（包含role和content字段）
+            const isNewFormat = msg.query !== undefined || msg.answer !== undefined;
+            
+            console.log('[详细日志] 消息格式类型:', isNewFormat ? '新格式(query/answer)' : '旧格式(role/content)');
+            
+            if (isNewFormat) {
+              // 处理新格式 - 每个消息对象拆分为用户和AI两条消息
+              if (msg.query) {
+                formattedMessages.push({
+                  id: msg.id + '-user',
+                  conversation_id: msg.conversation_id,
+                  role: 'user',
+                  content: msg.query || '',
+                  created_at: msg.created_at ? new Date(msg.created_at).getTime() / 1000 - 1 : Date.now() / 1000 - 1, // 用户消息稍早
+                  isComplete: true,
+                  isStreaming: false
+                });
+              }
+              
+              if (msg.answer) {
+                formattedMessages.push({
+                  id: msg.id + '-assistant',
+                  conversation_id: msg.conversation_id,
+                  role: 'assistant',
+                  content: msg.answer || '',
+                  created_at: msg.created_at ? new Date(msg.created_at).getTime() / 1000 : Date.now() / 1000,
+                  isComplete: true,
+                  isStreaming: false
+                });
+              }
+            } else {
+              // 处理旧格式 - 直接映射字段
+              formattedMessages.push({
+                id: msg.id,
+                conversation_id: msg.conversation_id,
+                role: msg.role,
+                content: msg.content || '',
+                created_at: msg.created_at ? new Date(msg.created_at).getTime() / 1000 : Date.now() / 1000,
+                isComplete: true,
+                isStreaming: false
+              });
+            }
+          });
+          
+          console.log('[详细日志] 格式化后消息数量:', formattedMessages.length, '更新前本地消息数量:', messages.value.length);
+          console.log('[详细日志] 格式化后消息角色列表:', formattedMessages.map(m => m.role));
           
           // 更新消息列表
           messages.value = formattedMessages;
+          
+          // 记录更新后的状态
+          console.log('[详细日志] 更新后本地消息数量:', messages.value.length, '第一条消息ID:', messages.value[0]?.id);
           
           // 重置所有状态变量，确保不会处于"对话中"状态
           isLoading.value = false;
           isStreaming.value = false;
           isGenerating.value = false;
           currentTask.value = null;
+        } else {
+          console.log('[详细日志] 获取的不是当前会话的消息，目标会话:', targetId, '当前会话:', currentConversationId.value);
         }
         
         return response;
+      } else {
+        console.warn('[详细日志] 获取消息响应异常:', response);
       }
     } catch (error) {
+      console.error('[详细日志] 获取消息失败:', error, '会话ID:', targetId, '应用类型:', currentAppType.value);
+      
       // 特殊处理会话不存在的错误
       if (error.message && error.message.includes('Conversation Not Exists')) {
         logDebug('服务器上不存在此会话，清除当前会话ID', { conversationId: targetId });
@@ -785,8 +864,9 @@ export const useChatStore = defineStore('chat', () => {
     }
   };
   
-  // 处理后端返回的对话ID
+  // 保存对话ID和处理本地存储
   const handleConversationId = (id) => {
+    console.log('处理会话ID:', id);
     if (!id) return false;
     
     const oldId = currentConversationId.value;
@@ -795,18 +875,27 @@ export const useChatStore = defineStore('chat', () => {
     currentConversationId.value = id;
     logDebug('设置会话ID', { conversation_id: id, oldId });
     
-    // 保存到sessionStorage
+    // 根据应用类型保存到不同的存储键中
     if (currentAppType.value === chatAPI.APP_TYPES.TRAVEL) {
       sessionStorage.setItem('travel_conversation_id', id);
     } else if (currentAppType.value === chatAPI.APP_TYPES.DESTINY) {
       sessionStorage.setItem('destiny_conversation_id', id);
+    } else if (currentAppType.value === chatAPI.APP_TYPES.INTELLIGENT) {
+      sessionStorage.setItem('intelligent_conversation_id', id);
+    } else if (currentAppType.value === chatAPI.APP_TYPES.SOLUTION) {
+      sessionStorage.setItem('solution_conversation_id', id);
+    } else if (currentAppType.value === chatAPI.APP_TYPES.ENTERPRISE) {
+      sessionStorage.setItem('enterprise_conversation_id', id);
+    } else {
+      // 默认情况
+      sessionStorage.setItem('chat_conversation_id', id);
     }
     
     // 如果中间层已启用，同步会话数据
     if (isUsingMiddleLayer.value) {
       // 注册或更新中间层会话
       swManager.registerSession(id, {
-        type: currentAppType.value === chatAPI.APP_TYPES.TRAVEL ? 'travel-assistant' : 'destiny-assistant',
+        type: getSessionType(),
         userId: userId.value,
         messages: sortedMessages.value,
         created_at: Date.now()
@@ -817,6 +906,24 @@ export const useChatStore = defineStore('chat', () => {
     }
     
     return true;
+  };
+  
+  // 根据应用类型获取会话类型
+  const getSessionType = () => {
+    switch(currentAppType.value) {
+      case chatAPI.APP_TYPES.TRAVEL:
+        return 'travel-assistant';
+      case chatAPI.APP_TYPES.DESTINY:
+        return 'destiny-assistant';
+      case chatAPI.APP_TYPES.INTELLIGENT:
+        return 'intelligent-assistant';
+      case chatAPI.APP_TYPES.SOLUTION:
+        return 'solution-assistant';
+      case chatAPI.APP_TYPES.ENTERPRISE:
+        return 'enterprise-assistant';
+      default:
+        return 'chat-assistant';
+    }
   };
   
   // 处理消息流

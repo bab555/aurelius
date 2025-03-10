@@ -71,7 +71,7 @@ const router = createRouter({
     {
       path: '/assistant/travel',
       name: 'travel-assistant',
-      component: () => import('../views/assistants/TravelAssistant.vue')
+      redirect: '/assistant'
     },
     {
       path: '/assistant/search',
