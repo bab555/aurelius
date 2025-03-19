@@ -5,18 +5,35 @@ const VERSION = '1.0.1';
 // 缓存当前会话状态
 const activeSessionsMap = new Map();
 
+// 记录客户端流式输出状态
+self.clientStreaming = false;
+
 // 安装事件
 self.addEventListener('install', event => {
   console.log('[Service Worker] 安装成功 v' + VERSION);
-  // 立即激活，不等待
-  self.skipWaiting();
+  
+  // 如果检测到客户端正在流式输出，推迟激活
+  if (self.clientStreaming) {
+    console.log('[Service Worker] 检测到客户端正在流式输出，推迟激活');
+    // 不调用skipWaiting()，让更新等待
+  } else {
+    // 立即激活，不等待
+    self.skipWaiting();
+  }
 });
 
 // 激活事件
 self.addEventListener('activate', event => {
   console.log('[Service Worker] 已激活');
-  // 立即接管所有客户端
-  event.waitUntil(clients.claim());
+  
+  // 如果检测到客户端正在流式输出，推迟接管
+  if (self.clientStreaming) {
+    console.log('[Service Worker] 检测到客户端正在流式输出，推迟接管');
+    // 不立即接管客户端
+  } else {
+    // 立即接管所有客户端
+    event.waitUntil(clients.claim());
+  }
 });
 
 // 处理客户端消息
@@ -28,6 +45,19 @@ self.addEventListener('message', function(event) {
   }
   
   console.log('[Service Worker] 收到消息:', message.type);
+  
+  // 处理流式输出状态消息
+  if (message.type === 'STREAMING_STATE') {
+    self.clientStreaming = message.streaming;
+    console.log(`[Service Worker] 客户端流式输出状态: ${self.clientStreaming ? '进行中' : '已结束'}`);
+    
+    // 如果流式输出结束，且处于等待接管状态，则立即接管
+    if (!self.clientStreaming && self.registration.waiting) {
+      console.log('[Service Worker] 流式输出已结束，执行推迟的更新');
+      self.skipWaiting();
+    }
+    return;
+  }
   
   try {
     switch (message.type) {

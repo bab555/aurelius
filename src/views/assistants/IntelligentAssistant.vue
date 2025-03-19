@@ -36,7 +36,11 @@
       <!-- 聊天区域 - 使用flex-1确保填充可用空间 -->
       <div class="flex-1 bg-[#0e0b36] p-4 md:p-6 mb-4 rounded-lg flex flex-col min-h-0">
         <!-- 聊天记录 - 确保有明确的高度和滚动设置 -->
-        <div class="flex-1 overflow-y-auto custom-scrollbar min-h-0" ref="chatContainer">
+        <div 
+          ref="chatContainer"
+          class="flex-1 overflow-y-auto custom-scrollbar px-2 py-4"
+          :class="{'pb-32': chatStore.messages.length > 0}"
+        >
           <!-- 加载状态 -->
           <div v-if="isLoading && messages.length === 0" class="flex justify-center py-10">
             <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
@@ -94,7 +98,7 @@
                   </div>
                   <div v-else class="text-gray-200">
                     <message-formatter 
-                      :content="msg.content || ''"
+                      :content="msg.content || ''" 
                       @thinking-processing="pauseScrolling"
                       @thinking-processed="resumeScrolling"
                     ></message-formatter>
@@ -236,6 +240,9 @@ const suggestions = [
   "如何利用大模型提升工作效率？给我一些实用建议"
 ]
 
+// 添加防抖变量
+let isSendingMessage = false;
+
 // 自动调整文本框高度
 const adjustTextareaHeight = () => {
   if (!textareaRef.value) return
@@ -252,46 +259,37 @@ watch(userInput, adjustTextareaHeight)
 // 计算属性
 const messages = computed(() => chatStore.sortedMessages)
 
-// 简化滚动逻辑，专注于用户体验
-const autoScrollEnabled = ref(true); // 默认启用自动滚动
-const isUserScrolling = ref(false);
-const lastScrollTime = ref(0);
+// 滚动控制 - 从命理页面复制
+let autoScrollPaused = false;
+let hasScrolled = false;
 
-// 简化的滚动到底部函数，使用直接方法
-const scrollToBottom = (force = false) => {
-  // 如果用户已禁用自动滚动且不是强制滚动，则不执行
-  if (!autoScrollEnabled.value && !force) {
-    return;
-  }
-  
-  // 如果没有聊天容器则退出
+// 用户手动滚动时暂停自动滚动
+const handleScroll = () => {
   if (!chatContainer.value) return;
   
-  // 记录上次滚动时间
-  lastScrollTime.value = Date.now();
+  const container = chatContainer.value;
+  const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 30;
   
-  // 直接执行滚动
-  console.log('[滚动控制] 执行滚动到底部');
-  try {
-    // 使用原生方法保证可靠性
-    if (force) {
-      // 立即滚动（无动画）
-      chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
-    } else {
-      // 平滑滚动
-      chatContainer.value.scrollTo({
-        top: chatContainer.value.scrollHeight,
-        behavior: 'smooth'
-      });
-    }
-  } catch (e) {
-    console.error('滚动失败:', e);
-    // 回退方法
-    chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+  if (!atBottom) {
+    autoScrollPaused = true;
+    hasScrolled = true;
+  } else {
+    autoScrollPaused = false;
   }
 };
 
-// 设置基本滚动监听
+// 滚动到底部
+const scrollToBottom = (force = false) => {
+  nextTick(() => {
+    if (!chatContainer.value) return;
+    
+    if (force || !autoScrollPaused) {
+      chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+    }
+  });
+};
+
+// 设置滚动系统 - 从Assistant.vue复制
 const setupScrollSystem = () => {
   if (!chatContainer.value) return;
   
@@ -307,65 +305,57 @@ const setupScrollSystem = () => {
     // 如果距离底部超过200px，认为用户在查看历史
     if (distanceFromBottom > 200) {
       // 用户明显向上滚动，临时禁用自动滚动
-      autoScrollEnabled.value = false;
-      isUserScrolling.value = true;
+      autoScrollPaused = true;
+      hasScrolled = true;
       console.log('[滚动控制] 用户正在查看历史消息，自动滚动已禁用');
     } else {
       // 用户滚回底部，重新启用自动滚动
-      autoScrollEnabled.value = true;
-      isUserScrolling.value = false;
+      autoScrollPaused = false;
       console.log('[滚动控制] 用户已接近底部，自动滚动已启用');
     }
   });
-  
-  // 定期检查内容变化并滚动
-  const checkContentAndScroll = () => {
-    // 聊天内容变化时自动滚动
-    if (autoScrollEnabled.value && chatContainer.value) {
-      // 检查是否有新消息
-      const lastMessage = messages.value[messages.value.length - 1];
-      const isNewUserMessage = lastMessage && lastMessage.role === 'user';
-      const isStreaming = lastMessage && lastMessage.isStreaming;
-      
-      // 如果是用户新消息或正在流式显示，滚动到底部
-      if (isNewUserMessage || isStreaming) {
-        scrollToBottom();
-      }
-    }
-  };
   
   // 创建MutationObserver监听消息区域DOM变化
   observer.value = new MutationObserver(() => {
     // 防抖处理
     clearTimeout(scrollDebounceTimer.value);
     scrollDebounceTimer.value = setTimeout(() => {
-      checkContentAndScroll();
+      // 聊天内容变化时自动滚动
+      if (!autoScrollPaused && chatContainer.value) {
+        // 检查是否有新消息
+        const lastMessage = messages.value[messages.value.length - 1];
+        const isNewUserMessage = lastMessage && lastMessage.role === 'user';
+        const isStreaming = lastMessage && lastMessage.isStreaming;
+        
+        // 如果是用户新消息或正在流式显示，滚动到底部
+        if (isNewUserMessage || isStreaming) {
+          scrollToBottom();
+        }
+      }
     }, 100);
   });
   
   // 开始观察变化
-  observer.value.observe(chatContainer.value, {
-    childList: true,
-    subtree: true,
-    characterData: true
-  });
+  if (chatContainer.value) {
+    observer.value.observe(chatContainer.value, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+  }
 };
 
-// 在思考框处理时暂停滚动
+// 处理思考框暂停滚动
 const pauseScrolling = () => {
-  console.log('[滚动控制] 暂停滚动');
-  autoScrollEnabled.value = false;
+  autoScrollPaused = true;
+  console.log('暂停自动滚动 - 思考框处理中');
 };
 
-// 思考框处理完成后恢复滚动
+// 恢复自动滚动
 const resumeScrolling = () => {
-  console.log('[滚动控制] 恢复滚动');
-  autoScrollEnabled.value = true;
-  
-  // 在恢复滚动时执行一次滚动
-  setTimeout(() => {
-    scrollToBottom();
-  }, 50);
+  autoScrollPaused = false;
+  scrollToBottom(true);
+  console.log('恢复自动滚动 - 思考框处理完成');
 };
 
 // 监听消息数量变化，处理新消息
@@ -379,66 +369,57 @@ watch(() => messages.value.length, (newCount, oldCount) => {
   }
 });
 
-// 发送消息
+// 发送消息 - 改进版本，结合命理页面和文旅助手页面的优点
 const sendMessage = async () => {
   // 获取输入框内容并清空
-  const content = userInput.value.trim()
-  if ((!content && !selectedFile.value) || isLoading.value) return
+  const content = userInput.value.trim();
+  if ((!content && !selectedFile.value) || isLoading.value || isSendingMessage) return;
+  
+  // 设置防抖状态
+  isSendingMessage = true;
   
   // 清空输入框
-  userInput.value = ''
-  adjustTextareaHeight()
+  userInput.value = '';
+  adjustTextareaHeight();
   
   try {
-    // 检查并修复可能错误的状态
-    if (chatStore.isLoading || chatStore.isStreaming || chatStore.isGenerating) {
-      console.warn('检测到不一致的状态，尝试自动修复');
-      
-      // 修正所有流式消息的状态
-      chatStore.messages.forEach(msg => {
-        if (msg.isStreaming) {
-          msg.isStreaming = false;
-          msg.content += '\n\n[系统自动修复：此消息在开始新对话前已标记为已完成]';
-        }
-      });
-      
-      // 强制重置所有状态变量
-      chatStore.isLoading = false;
-      chatStore.isStreaming = false;
-      chatStore.isGenerating = false;
-      chatStore.currentTask = null;
-    }
+    // 彻底重置状态 - 来自命理页面的更严格状态管理
+    chatStore.isLoading = false;
+    chatStore.isStreaming = false;
+    chatStore.isGenerating = false;
+    chatStore.currentTask = null;
     
     // 重新启用自动滚动
-    autoScrollEnabled.value = true
+    autoScrollPaused = false;
     
-    // 先滚动到底部
-    scrollToBottom(true)
+    // 先滚动到底部确保用户可以看到消息
+    scrollToBottom(true);
     
     // 如果使用中间层且当前会话已存在，需要确保同步状态
     if (chatStore.isUsingMiddleLayer && chatStore.currentConversationId) {
       // 首次发送消息时与中间层同步
       if (!syncedWithMiddleLayer.value) {
         try {
-          console.log('首次同步会话到中间层:', chatStore.currentConversationId)
-          await syncWithMiddleLayer()
+          console.log('首次同步会话到中间层:', chatStore.currentConversationId);
+          await syncWithMiddleLayer();
         } catch (e) {
-          console.warn('同步到中间层失败:', e)
+          console.warn('同步到中间层失败:', e);
           // 继续发送消息，即使同步失败
         }
-      } else if (syncedWithMiddleLayer.value) {
-        // 如果会话已标记为完成，尝试继续会话
-        console.log('检查是否需要继续已完成的会话')
+      } else {
+        // 如果会话已存在，简单更新而不是尝试继续
         try {
-          await swManager.continueSession(chatStore.currentConversationId)
+          await swManager.updateSession(chatStore.currentConversationId, {
+            lastUpdated: Date.now()
+          });
         } catch (e) {
-          console.warn('继续会话失败，将尝试发送消息:', e)
-          // 继续执行，即使继续会话失败
+          console.warn('更新会话状态失败:', e);
+          // 继续执行，即使更新失败
         }
       }
     }
     
-    // 如果有文件，上传文件后再发送消息
+    // 保留文件上传逻辑
     if (selectedFile.value) {
       try {
         console.log('准备上传文件:', selectedFile.value.name);
@@ -460,7 +441,6 @@ const sendMessage = async () => {
         });
       } catch (error) {
         console.error('文件上传失败:', error);
-        // 即使文件上传失败，仍然尝试发送文本消息
         if (content) {
           await chatStore.sendMessage(content);
         } else {
@@ -474,31 +454,31 @@ const sendMessage = async () => {
       }
     } else {
       // 正常发送纯文本消息
-      await chatStore.sendMessage(content)
+      await chatStore.sendMessage(content);
     }
     
     // 消息发送成功，保存会话ID并同步
     if (chatStore.currentConversationId) {
-      sessionStorage.setItem('intelligent_conversation_id', chatStore.currentConversationId)
+      sessionStorage.setItem('intelligent_conversation_id', chatStore.currentConversationId);
       
       // 如果是使用中间层且首次同步
       if (chatStore.isUsingMiddleLayer && !syncedWithMiddleLayer.value) {
-        console.log('消息发送成功，首次同步会话到中间层', chatStore.currentConversationId)
-        await syncWithMiddleLayer()
+        console.log('消息发送成功，首次同步会话到中间层', chatStore.currentConversationId);
+        await syncWithMiddleLayer();
       }
     }
     
     // 消息发送后再次滚动到底部
     setTimeout(() => {
-      scrollToBottom(true)
-    }, 100)
+      scrollToBottom(true);
+    }, 100);
   } catch (e) {
-    console.error('发送消息失败:', e)
+    console.error('发送消息失败:', e);
     
     // 如果是会话不存在错误，则清理会话ID
     if (e.message && e.message.includes('Conversation Not Exists')) {
-      console.warn('会话不存在，清理会话ID')
-      await cleanupSession()
+      console.warn('会话不存在，清理会话ID');
+      await cleanupSession();
     }
     
     // 显示错误消息给用户
@@ -516,79 +496,18 @@ const sendMessage = async () => {
       userInput.value = content;
       adjustTextareaHeight();
     }
+  } finally {
+    // 延迟重置发送状态，防止快速重复点击
+    setTimeout(() => {
+      isSendingMessage = false;
+    }, 3000);
   }
-}
+};
 
 // 开始以建议开始对话
 const startConversation = (suggestion) => {
   userInput.value = suggestion
   sendMessage()
-}
-
-// 格式化消息内容（处理换行、链接等）
-const formatMessage = (content) => {
-  if (!content) return ''
-  
-  try {
-    // 保留原始换行符，不做替换
-    // let formatted = content.replace(/\n/g, '<br>')
-    let formatted = content
-    
-    // 将URL转换为可点击的链接
-    formatted = formatted.replace(
-      /(https?:\/\/[^\s]+)/g, 
-      '<a href="$1" target="_blank" class="text-primary hover:underline">$1</a>'
-    )
-    
-    // 先处理完整的details标签，但跳过已处理的思考框
-    if (formatted.includes('<details>') && formatted.includes('</details>') && !formatted.includes('class="thinking-box"')) {
-      try {
-        // 跳过思考框内容，仅处理其他details
-        const detailsPattern = /<details>([\s\S]*?)<summary>(?!Thinking)([\s\S]*?)<\/summary>([\s\S]*?)<\/details>/g;
-        formatted = formatted.replace(detailsPattern, 
-          '<details class="my-3 bg-[#070620] rounded-lg overflow-hidden border border-primary/10"><summary class="p-3 cursor-pointer text-gray-300 font-medium hover:bg-[#0a0830] transition-colors">$2</summary><div class="p-3 border-t border-primary/10 bg-[#080722] text-gray-300">$3</div></details>');
-      } catch (e) {
-        console.error('重新处理details标签失败', e);
-      }
-    }
-    
-    // 处理不完整的details和summary标签
-    if (formatted.includes('<details>') && !formatted.includes('</details>') && !formatted.includes('class="thinking-box"')) {
-      formatted = formatted.replace(/<details>(?![\s\S]*?Thinking)([\s\S]*)$/, 
-        '<div class="bg-[#070620] rounded-lg p-3 border border-primary/10 text-gray-300">$1</div>');
-    }
-    
-    if (formatted.includes('<summary>') && !formatted.includes('</summary>')) {
-      formatted = formatted.replace(/<summary>([\s\S]*)$/, 
-        '<div class="font-medium">$1</div>');
-    }
-    
-    // 处理代码块
-    formatted = formatted.replace(
-      /```([a-z]*)\n([\s\S]+?)\n```/g,
-      '<pre class="bg-[#111030] border border-primary/20 p-4 rounded-lg my-3 overflow-x-auto"><code class="text-gray-300 font-mono text-sm">$2</code></pre>'
-    )
-    
-    // 处理行内代码
-    formatted = formatted.replace(
-      /`([^`]+)`/g,
-      '<code class="bg-[#111030] border border-primary/10 px-1.5 py-0.5 rounded text-gray-300 font-mono text-sm">$1</code>'
-    )
-    
-    // 最后将换行符替换为<br>
-    // formatted = formatted.replace(/\n/g, '<br>')
-    
-    // 将URL转换为可点击的链接
-    formatted = formatted.replace(
-      /(https?:\/\/[^\s]+)/g, 
-      '<a href="$1" target="_blank" class="text-primary hover:underline">$1</a>'
-    )
-    
-    return formatted
-  } catch (error) {
-    console.error('格式化消息失败:', error)
-    return content || ''
-  }
 }
 
 // 测试API连接
@@ -599,21 +518,42 @@ const testConnection = async () => {
 // 生命周期钩子注册 - 提前注册所有钩子
 onBeforeUnmount(() => {
   try {
+    // 移除滚动监听器
+    if (chatContainer.value) {
+      chatContainer.value.removeEventListener('scroll', handleScroll);
+    }
+    
+    // 清理MutationObserver
+    if (observer.value) {
+      observer.value.disconnect();
+    }
+    
+    // 清理定时器
+    if (scrollDebounceTimer.value) {
+      clearTimeout(scrollDebounceTimer.value);
+    }
+    
+    // 移除页面可见性事件监听器
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    
     // 如果有活跃会话且使用中间层，标记会话完成
     if (chatStore.isUsingMiddleLayer && chatStore.currentConversationId && syncedWithMiddleLayer.value) {
       try {
         console.log('智能助手页面卸载，标记会话完成并清理资源', chatStore.currentConversationId);
         swManager.completeSession(chatStore.currentConversationId);
-        swManager.clearSession(chatStore.currentConversationId);
       } catch (error) {
         console.error('标记会话完成失败:', error);
       }
     }
     
-    // 移除事件监听器
-    window.removeEventListener('focus', handleWindowFocus);
-    window.removeEventListener('blur', handleWindowBlur);
-    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    // 安全地移除Service Worker会话监听器
+    if (chatStore.currentConversationId && chatStore.isUsingMiddleLayer) {
+      try {
+        swManager.removeSessionListener(chatStore.currentConversationId, handleSessionUpdate);
+      } catch (error) {
+        console.warn('移除会话监听器失败:', error);
+      }
+    }
     
     // 保存会话ID到sessionStorage
     if (chatStore.currentConversationId) {
@@ -627,8 +567,15 @@ onBeforeUnmount(() => {
 // 页面加载时初始化
 onMounted(async () => {
   try {
-    // 初始化聊天状态，使用智能助手APP_TYPE
-    await chatStore.initialize(chatAPI.APP_TYPES.INTELLIGENT);
+    // 设置滚动监听
+    if (chatContainer.value) {
+      chatContainer.value.addEventListener('scroll', handleScroll);
+    }
+    
+    // 确保chat store初始化
+    if (!chatStore.isInitialized) {
+      await chatStore.initialize('intelligent');
+    }
     
     // 检查API连接状态
     await chatStore.checkConnection();
@@ -795,7 +742,7 @@ onMounted(async () => {
     // 添加页面可见性变更监听
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    // 设置滚动系统
+    // 设置滚动系统 - 确保在DOM准备好后调用
     nextTick(() => {
       setupScrollSystem();
       
@@ -864,7 +811,32 @@ const syncWithMiddleLayer = async () => {
     syncedWithMiddleLayer.value = true;
     console.log('会话已成功同步到中间层:', chatStore.currentConversationId);
   } catch (error) {
+    // 增强Service Worker错误处理
     console.error('同步到中间层失败:', error);
+    
+    if (error.toString().includes('Could not establish connection') || 
+        error.toString().includes('Receiving end does not exist')) {
+      console.warn('检测到Service Worker连接错误，尝试自动修复状态');
+      
+      // 修正所有流式消息的状态，确保UI正常呈现
+      chatStore.messages.forEach(msg => {
+        if (msg.isStreaming) {
+          console.log('检测到异常流式消息状态，自动修复');
+          msg.isStreaming = false;
+          msg.content += '\n\n[系统自动修复：此消息因Service Worker连接错误而被标记为已完成]';
+        }
+      });
+      
+      // 重置所有状态
+      chatStore.isLoading = false;
+      chatStore.isStreaming = false;
+      chatStore.isGenerating = false;
+      chatStore.currentTask = null;
+      
+      // 由于Service Worker连接错误，禁用中间层功能
+      chatStore.isUsingMiddleLayer = false;
+    }
+    
     // 继续操作，即使同步失败
   }
 };
@@ -881,6 +853,13 @@ const cleanupSession = async () => {
         console.log('已清理中间层会话:', oldId);
       } catch (e) {
         console.warn('清理中间层会话失败:', e);
+        
+        // 检查Service Worker连接错误
+        if (e.toString().includes('Could not establish connection') || 
+            e.toString().includes('Receiving end does not exist')) {
+          console.warn('检测到Service Worker连接错误，禁用中间层功能');
+          chatStore.isUsingMiddleLayer = false;
+        }
       }
     }
     
@@ -909,55 +888,85 @@ const handleVisibilityChange = async () => {
     // 页面变为可见时
     console.log('智能助手页面恢复可见');
     
-    // 如果有当前会话ID，检查会话是否仍然有效
-    if (chatStore.currentConversationId) {
-      try {
-        // 检查会话是否存在于sessionStorage中
-        const storedId = sessionStorage.getItem('intelligent_conversation_id');
-        
-        if (storedId !== chatStore.currentConversationId) {
-          console.log('会话ID不匹配，更新到sessionStorage', {
-            stored: storedId,
-            current: chatStore.currentConversationId
-          });
-          sessionStorage.setItem('intelligent_conversation_id', chatStore.currentConversationId);
-        }
-        
-        // 检查是否有处于流式状态的消息
-        const hasStreamingMessage = chatStore.messages.some(msg => msg.isStreaming);
-        
-        if (hasStreamingMessage) {
-          console.log('检测到有流式消息，页面切换回来时自动标记为完成');
-          
-          // 修正所有流式消息的状态
-          chatStore.messages.forEach(msg => {
-            if (msg.isStreaming) {
-              msg.isStreaming = false;
-              msg.content += '\n\n[此消息在页面切换回时已自动标记为已完成]';
-            }
-          });
-          
-          // 强制重置所有状态变量
-          chatStore.isLoading = false;
-          chatStore.isStreaming = false;
-          chatStore.isGenerating = false;
-          chatStore.currentTask = null;
-        }
-        
-        // 如果使用中间层，检查会话是否同步
-        if (chatStore.isUsingMiddleLayer && !syncedWithMiddleLayer.value) {
-          await syncWithMiddleLayer();
-        }
-      } catch (error) {
-        console.warn('页面恢复可见时同步会话状态失败:', error);
-      }
-    }
-    
-    // 重新检查API连接状态
     try {
+      // 如果有当前会话ID，检查会话是否仍然有效
+      if (chatStore.currentConversationId) {
+        try {
+          // 检查会话是否存在于sessionStorage中
+          const storedId = sessionStorage.getItem('intelligent_conversation_id');
+          
+          if (storedId !== chatStore.currentConversationId) {
+            console.log('会话ID不匹配，更新到sessionStorage', {
+              stored: storedId,
+              current: chatStore.currentConversationId
+            });
+            sessionStorage.setItem('intelligent_conversation_id', chatStore.currentConversationId);
+          }
+          
+          // 检查是否有处于流式状态的消息
+          const hasStreamingMessage = chatStore.messages.some(msg => msg.isStreaming);
+          
+          if (hasStreamingMessage) {
+            console.log('检测到有流式消息，页面切换回来时自动标记为完成');
+            
+            // 修正所有流式消息的状态
+            chatStore.messages.forEach(msg => {
+              if (msg.isStreaming) {
+                msg.isStreaming = false;
+                msg.content += '\n\n[此消息在页面切换回时已自动标记为已完成]';
+              }
+            });
+            
+            // 强制重置所有状态变量
+            chatStore.isLoading = false;
+            chatStore.isStreaming = false;
+            chatStore.isGenerating = false;
+            chatStore.currentTask = null;
+          }
+          
+          // 如果使用中间层，检查会话是否同步
+          if (chatStore.isUsingMiddleLayer && !syncedWithMiddleLayer.value) {
+            await syncWithMiddleLayer();
+          }
+        } catch (error) {
+          console.warn('页面恢复可见时同步会话状态失败:', error);
+          
+          // 检查是否是Service Worker错误
+          if (error.toString().includes('Could not establish connection') || 
+              error.toString().includes('Receiving end does not exist')) {
+            console.warn('检测到Service Worker连接错误，禁用中间层功能');
+            
+            // 确保流式消息状态正确
+            chatStore.messages.forEach(msg => {
+              if (msg.isStreaming) {
+                msg.isStreaming = false;
+                msg.content += '\n\n[系统自动修复：此消息因Service Worker连接错误而被标记为已完成]';
+              }
+            });
+            
+            // 禁用中间层功能
+            chatStore.isUsingMiddleLayer = false;
+          }
+        }
+      }
+      
+      // 重新检查API连接状态
       await chatStore.checkConnection();
     } catch (e) {
-      console.warn('检查API连接状态失败:', e);
+      console.warn('页面可见性事件处理失败:', e);
+      
+      // 确保流式消息状态正确
+      chatStore.messages.forEach(msg => {
+        if (msg.isStreaming) {
+          msg.isStreaming = false;
+        }
+      });
+      
+      // 重置所有状态变量
+      chatStore.isLoading = false;
+      chatStore.isStreaming = false;
+      chatStore.isGenerating = false;
+      chatStore.currentTask = null;
     }
   } else if (document.visibilityState === 'hidden') {
     // 页面隐藏时，确保会话ID被保存
@@ -974,6 +983,13 @@ const handleVisibilityChange = async () => {
           });
         } catch (error) {
           console.warn('页面隐藏时同步到中间层失败:', error);
+          
+          // 检查是否是Service Worker错误
+          if (error.toString().includes('Could not establish connection') || 
+              error.toString().includes('Receiving end does not exist')) {
+            console.warn('检测到Service Worker连接错误，禁用中间层功能');
+            chatStore.isUsingMiddleLayer = false;
+          }
         }
       }
     }
@@ -1010,17 +1026,13 @@ const formatFileSize = (bytes) => {
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 };
-</script>
+
+</script> 
 
 <style scoped>
 /* 聊天相关样式 */
 .message-container:last-child {
   margin-bottom: 10px;
-}
-
-/* 确保文本正确换行的关键样式 */
-.text-gray-200 {
-  white-space: pre-wrap !important;
 }
 
 /* 自定义滚动条样式 */
@@ -1081,3 +1093,4 @@ const formatFileSize = (bytes) => {
   }
 }
 </style> 
+

@@ -11,7 +11,7 @@
         <div class="flex justify-between items-center">
           <div>
             <h1 class="text-2xl md:text-3xl font-bold text-white mb-2">命理算师</h1>
-            <p class="text-gray-400 text-sm">基于八字五行分析命理，揭示性格、事业、感情和财运走势</p>
+            <p class="text-gray-400 text-sm">独家完美实现古籍与程序结合八字传统排盘算法，基于古籍的严谨测算，精确分析命格，无限伦次对话，预测命运轨迹</p>
           </div>
           <button 
             @click="showBirthForm" 
@@ -127,38 +127,35 @@
         </div>
       </div>
 
-      <!-- 底部输入区域 -->
-      <div class="mt-4 flex-shrink-0">
-        <div class="flex items-center space-x-2">
-          <!-- 输入框 -->
-          <div class="relative flex-1">
-            <textarea 
-              v-model="userInput" 
-              @keydown.enter.prevent="sendMessage"
-              placeholder="输入您的问题..." 
-              class="bg-gray-900 border border-gray-700 rounded-lg text-white p-3 w-full focus:outline-none focus:border-primary resize-none"
-              rows="1"
-              ref="textareaRef"
-              :disabled="isLoading || !inputEnabled"
-              :class="{'opacity-70': !inputEnabled}"
-            ></textarea>
-          </div>
+      <!-- 用户输入表单 -->
+      <div class="fixed bottom-0 w-full max-w-4xl px-4 pb-4 z-10 bg-gray-950 bg-opacity-80 backdrop-blur-sm">
+        <div class="flex items-center bg-gray-900 rounded-lg shadow-lg border border-gray-800">
+          <textarea 
+            ref="textareaRef"
+            v-model="userInput" 
+            :disabled="!inputEnabled || chatStore.isLoading"
+            @keydown.enter.exact.prevent="doSendMessage"
+            placeholder="在此输入您的问题..."
+            class="flex-1 bg-transparent border-none text-white placeholder-gray-500 p-3 py-4 resize-none max-h-32 min-h-[56px]"
+            rows="1"
+          ></textarea>
           
-          <!-- 发送按钮 -->
           <button 
-            @click="sendMessage" 
-            class="h-[42px] w-10 bg-primary rounded-lg flex items-center justify-center flex-shrink-0"
-            :disabled="isLoading || !userInput.trim() || !inputEnabled"
-            :class="{'opacity-50 cursor-not-allowed': isLoading || !userInput.trim() || !inputEnabled}"
+            id="sendButton"
+            @click="doSendMessage"
+            :disabled="!inputEnabled || !userInput.trim() || chatStore.isLoading"
+            :class="{'opacity-50 cursor-not-allowed': !inputEnabled || !userInput.trim() || chatStore.isLoading, 
+                    'hover:bg-indigo-700': inputEnabled && userInput.trim() && !chatStore.isLoading}"
+            class="p-3 m-1 rounded-md bg-indigo-600 text-white focus:outline-none"
           >
-            <i class="fas fa-paper-plane text-white text-sm"></i>
+            <i class="fas fa-paper-plane"></i>
           </button>
         </div>
-        <div class="text-xs text-gray-500 mt-2 text-center" v-if="!inputEnabled">
-          请先提供出生信息进行八字测算，才能与命理大师对话
-        </div>
-        <div class="text-xs text-gray-500 mt-2 text-center" v-else>
-          命理算师，揭示命运走向，指引人生方向
+        
+        <!-- 输入状态提示 -->
+        <div v-if="!inputEnabled" class="text-gray-500 text-xs text-center mt-2">
+          <span v-if="!personInfo.name">请先填写您的个人信息</span>
+          <span v-else>正在分析您的命盘，请稍候...</span>
         </div>
       </div>
     </div>
@@ -166,49 +163,122 @@
   
   <!-- 出生信息表单弹窗 -->
   <Teleport to="body">
-    <div v-if="showBirthModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-      <div class="bg-[#111030] rounded-xl p-6 max-w-md w-full">
+    <div v-if="showBirthModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[1001] px-4">
+      <div class="bg-[#111030] rounded-xl p-4 md:p-6 w-full max-w-md overflow-y-auto max-h-[90vh]">
         <h2 class="text-xl font-bold text-white mb-4">请输入出生信息</h2>
         
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-300 mb-1">姓名（选填）</label>
-          <input v-model="personInfo.name" class="w-full p-2 bg-gray-900 text-white rounded border border-gray-700" placeholder="请输入姓名" />
+          <input v-model="personInfo.name" class="w-full p-2 bg-gray-900 text-white rounded border border-gray-700 appearance-none" placeholder="请输入姓名" />
         </div>
         
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-300 mb-1">性别</label>
           <div class="flex gap-4">
             <label class="flex items-center">
-              <input type="radio" v-model="personInfo.gender" value="男" class="mr-2" />
+              <input type="radio" v-model="personInfo.gender" value="男" class="mr-2 w-4 h-4" />
               <span class="text-gray-300">男</span>
             </label>
             <label class="flex items-center">
-              <input type="radio" v-model="personInfo.gender" value="女" class="mr-2" />
+              <input type="radio" v-model="personInfo.gender" value="女" class="mr-2 w-4 h-4" />
               <span class="text-gray-300">女</span>
             </label>
           </div>
         </div>
         
         <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-300 mb-1">出生日期（公历）</label>
-          <div class="grid grid-cols-4 gap-2">
-            <select v-model="personInfo.year" class="p-2 bg-gray-900 text-white rounded border border-gray-700">
+          <div class="flex justify-between items-center mb-1">
+            <label class="block text-sm font-medium text-gray-300">出生日期</label>
+            <div class="flex items-center">
+              <button 
+                @click="toggleDateType" 
+                class="text-xs px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 text-white transition-colors"
+              >
+                切换到{{ isLunarDate ? '公历' : '农历' }}
+              </button>
+            </div>
+          </div>
+          
+          <!-- 公历日期选择器 -->
+          <div v-if="!isLunarDate" class="grid grid-cols-4 gap-2">
+            <select v-model="personInfo.year" class="p-2 bg-gray-900 text-white rounded border border-gray-700 appearance-none text-center">
               <option v-for="year in years" :key="year" :value="year">{{ year }}年</option>
             </select>
             
-            <select v-model="personInfo.month" class="p-2 bg-gray-900 text-white rounded border border-gray-700">
+            <select v-model="personInfo.month" class="p-2 bg-gray-900 text-white rounded border border-gray-700 appearance-none text-center">
               <option v-for="month in 12" :key="month" :value="month">{{ month }}月</option>
             </select>
             
-            <select v-model="personInfo.day" class="p-2 bg-gray-900 text-white rounded border border-gray-700">
+            <select v-model="personInfo.day" class="p-2 bg-gray-900 text-white rounded border border-gray-700 appearance-none text-center">
               <option v-for="day in days" :key="day" :value="day">{{ day }}日</option>
+            </select>
+            
+            <select v-model="personInfo.hour" class="p-2 bg-gray-900 text-white rounded border border-gray-700 appearance-none text-center">
+              <option v-for="hour in 24" :key="hour-1" :value="hour-1">{{ hour-1 }}时</option>
+            </select>
+          </div>
+          
+          <!-- 农历日期选择器 -->
+          <div v-else class="grid grid-cols-4 gap-2">
+            <select v-model="lunarDate.year" class="p-2 bg-gray-900 text-white rounded border border-gray-700">
+              <option v-for="year in years" :key="year" :value="year">{{ year }}年</option>
+            </select>
+            
+            <select v-model="lunarDate.month" class="p-2 bg-gray-900 text-white rounded border border-gray-700">
+              <option v-for="month in 12" :key="month" :value="month">{{ month }}月</option>
+            </select>
+            
+            <select v-model="lunarDate.day" class="p-2 bg-gray-900 text-white rounded border border-gray-700">
+              <option v-for="day in lunarDays" :key="day" :value="day">{{ day }}日</option>
             </select>
             
             <select v-model="personInfo.hour" class="p-2 bg-gray-900 text-white rounded border border-gray-700">
               <option v-for="hour in 24" :key="hour-1" :value="hour-1">{{ hour-1 }}时</option>
             </select>
+        </div>
+        
+          <p class="text-xs text-gray-500 mt-1">当前使用{{ isLunarDate ? '农历' : '公历' }}日期</p>
+        </div>
+        
+        <!-- 真太阳时和经纬度（可选） -->
+        <div class="mb-4">
+          <div class="flex justify-between items-center mb-1">
+            <label class="block text-sm font-medium text-gray-300">真太阳时与经纬度（可选）</label>
+            <div class="flex items-center">
+              <button 
+                @click="personInfo.useRealSolarTime = !personInfo.useRealSolarTime" 
+                class="text-xs px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 text-white transition-colors"
+              >
+                {{ personInfo.useRealSolarTime ? '不使用' : '使用' }}真太阳时
+          </button>
+            </div>
           </div>
-          <p class="text-xs text-gray-500 mt-1">请输入公历生日</p>
+
+          <div v-if="personInfo.useRealSolarTime" class="space-y-2">
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs text-gray-400 mb-1">经度</label>
+                <input 
+                  v-model="personInfo.longitude" 
+                  type="number" 
+                  step="0.01" 
+                  class="w-full p-2 bg-gray-900 text-white rounded border border-gray-700" 
+                  placeholder="如：116.40" 
+                />
+              </div>
+              <div>
+                <label class="block text-xs text-gray-400 mb-1">纬度</label>
+                <input 
+                  v-model="personInfo.latitude" 
+                  type="number" 
+                  step="0.01" 
+                  class="w-full p-2 bg-gray-900 text-white rounded border border-gray-700" 
+                  placeholder="如：39.90" 
+                />
+              </div>
+            </div>
+            <p class="text-xs text-gray-500">经纬度会影响真太阳时计算精度，增加命理分析准确性</p>
+          </div>
         </div>
         
         <div class="flex justify-center mt-6">
@@ -222,8 +292,8 @@
 
   <!-- 算命结果弹窗 -->
   <Teleport to="body">
-    <div v-if="showResultModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-      <div class="bg-[#111030] rounded-xl p-6 max-w-xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+    <div v-if="showResultModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[1001] px-4">
+      <div class="bg-[#111030] rounded-xl p-4 md:p-6 w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-bold text-white">八字分析结果</h2>
           <button 
@@ -234,17 +304,17 @@
           </button>
         </div>
         
-        <div class="bg-gray-800/50 rounded-lg p-4 mb-6 flex-1 overflow-y-auto custom-scrollbar">
+        <div class="bg-gray-800/50 rounded-lg p-3 md:p-4 mb-4 md:mb-6 flex-1 overflow-y-auto custom-scrollbar">
           <div id="result-content" class="text-white whitespace-pre-wrap break-words select-text text-sm leading-relaxed" v-html="formatResultContent(latestResult)"></div>
         </div>
         
         <p class="text-center text-gray-300 mb-4">是否与大师继续交谈，获取更详细结果？</p>
         
         <div class="flex justify-center space-x-4">
-          <button @click="continueDivination" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+          <button @click="continueDivination" class="px-4 md:px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
             是
           </button>
-          <button @click="endDivination" class="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors">
+          <button @click="endDivination" class="px-4 md:px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors">
             否
           </button>
         </div>
@@ -262,6 +332,8 @@ import MessageFormatter from '../../components/MessageFormatter.vue'
 import { APP_TYPES } from '../../services/chatAPI'
 import DOMPurify from 'dompurify'
 import * as swManager from '../../services/swManager'
+// 引入农历转换库
+import { Lunar, Solar } from 'lunar-javascript'
 
 // 使用路由
 const router = useRouter();
@@ -281,9 +353,24 @@ const showBirthModal = ref(false);
 const showResultModal = ref(false);
 const latestResult = ref('');
 const inputEnabled = ref(false);
+const isLunarDate = ref(false); // 是否使用农历
+const lastMessageTime = ref(Date.now()); // 上次消息发送时间
+const statusCheckInterval = ref(null); // 状态检查定时器
 const personInfo = ref({
   name: '',
   gender: '男',
+  year: 1990,
+  month: 1,
+  day: 1,
+  hour: 12,
+  isLunar: false, // 是否是农历日期
+  useRealSolarTime: false, // 是否使用真太阳时
+  longitude: 116.40, // 经度
+  latitude: 39.90 // 纬度
+});
+
+// 农历日期
+const lunarDate = ref({
   year: 1990,
   month: 1,
   day: 1,
@@ -300,17 +387,76 @@ const years = computed(() => {
   return result;
 });
 
-// 根据年月计算天数
+// 根据年月计算公历天数
 const days = computed(() => {
   return getDaysInMonth(personInfo.value.year, personInfo.value.month);
 });
+
+// 根据年月计算农历天数
+const lunarDays = computed(() => {
+  // 农历月份的天数
+  const year = lunarDate.value.year;
+  const month = lunarDate.value.month;
+  let dayCount = 30; // 默认大月
+  
+  try {
+    // 获取当前农历月的天数
+    const lunar = Lunar.fromYmd(year, month, 1);
+    dayCount = lunar.getDaysInMonth();
+  } catch (e) {
+    console.error('计算农历天数出错:', e);
+  }
+  
+  const result = [];
+  for (let i = 1; i <= dayCount; i++) {
+    result.push(i);
+  }
+  return result;
+});
+
+// 切换日期类型（公历/农历）
+const toggleDateType = () => {
+  isLunarDate.value = !isLunarDate.value;
+  personInfo.value.isLunar = isLunarDate.value;
+  
+  if (isLunarDate.value) {
+    // 公历转农历
+    try {
+      const solar = Solar.fromYmd(personInfo.value.year, personInfo.value.month, personInfo.value.day);
+      const lunar = solar.getLunar();
+      
+      // 更新农历日期
+      lunarDate.value = {
+        year: lunar.getYear(),
+        month: lunar.getMonth(),
+        day: lunar.getDay(),
+        hour: personInfo.value.hour
+      };
+    } catch (e) {
+      console.error('公历转农历失败:', e);
+    }
+  } else {
+    // 农历转公历
+    try {
+      const lunar = Lunar.fromYmd(lunarDate.value.year, lunarDate.value.month, lunarDate.value.day);
+      const solar = lunar.getSolar();
+      
+      // 更新公历日期
+      personInfo.value.year = solar.getYear();
+      personInfo.value.month = solar.getMonth();
+      personInfo.value.day = solar.getDay();
+    } catch (e) {
+      console.error('农历转公历失败:', e);
+    }
+  }
+};
 
 function getDaysInMonth(year, month) {
   // 获取指定年月的天数
   const daysInMonth = new Date(year, month, 0).getDate();
   const result = [];
-  for (let day = 1; day <= daysInMonth; day++) {
-    result.push(day);
+  for (let i = 1; i <= daysInMonth; i++) {
+    result.push(i);
   }
   return result;
 }
@@ -386,8 +532,8 @@ onBeforeUnmount(() => {
     if (chatStore.isUsingMiddleLayer && chatStore.currentConversationId) {
       try {
         console.log('命理算师页面卸载，标记会话完成并清理资源', chatStore.currentConversationId);
-        swManager.completeSession(chatStore.currentConversationId);
-        swManager.clearSession(chatStore.currentConversationId);
+      swManager.completeSession(chatStore.currentConversationId);
+      swManager.clearSession(chatStore.currentConversationId);
       } catch (error) {
         console.error('标记会话完成失败:', error);
       }
@@ -531,7 +677,30 @@ const showBirthForm = async () => {
     chatStore.currentTask = null;
     
     // 确保输入框被禁用，直到完成算命
-    inputEnabled.value = false;
+  inputEnabled.value = false;
+  }
+  
+  // 根据当前选择的日期类型设置状态
+  isLunarDate.value = personInfo.value.isLunar;
+  
+  // 如果是农历模式，确保农历日期已正确设置
+  if (isLunarDate.value && !lunarDate.value.year) {
+    try {
+      const solar = Solar.fromYmd(personInfo.value.year, personInfo.value.month, personInfo.value.day);
+      const lunar = solar.getLunar();
+      
+      lunarDate.value = {
+        year: lunar.getYear(),
+        month: lunar.getMonth(),
+        day: lunar.getDay(),
+        hour: personInfo.value.hour
+      };
+    } catch (e) {
+      console.error('公历转农历失败:', e);
+      // 出错时重置为公历模式
+      isLunarDate.value = false;
+      personInfo.value.isLunar = false;
+    }
   }
   
   // 显示表单
@@ -560,14 +729,51 @@ const startDivination = async () => {
     // 设置当前应用类型
     chatStore.setAppType(APP_TYPES.DESTINY);
     
-    // 构建年月日时字符串
-    const { year, month, day, hour } = personInfo.value;
-    const yearStr = year.toString();
-    const monthStr = month < 10 ? `0${month}` : month.toString();
-    const dayStr = day < 10 ? `0${day}` : day.toString();
-    const hourStr = hour < 10 ? `0${hour}` : hour.toString();
+    // 获取出生日期信息
+    let yearStr, monthStr, dayStr, hourStr;
+    let dateType = isLunarDate.value ? '农历' : '公历';
     
-    // 构建推送内容
+    if (isLunarDate.value) {
+      // 直接使用农历日期
+      yearStr = lunarDate.value.year.toString();
+      monthStr = lunarDate.value.month < 10 ? `0${lunarDate.value.month}` : lunarDate.value.month.toString();
+      dayStr = lunarDate.value.day < 10 ? `0${lunarDate.value.day}` : lunarDate.value.day.toString();
+      hourStr = personInfo.value.hour < 10 ? `0${personInfo.value.hour}` : personInfo.value.hour.toString();
+    } else {
+      // 使用公历日期，转换为农历后发送
+      try {
+        const solar = Solar.fromYmd(personInfo.value.year, personInfo.value.month, personInfo.value.day);
+        const lunar = solar.getLunar();
+        
+        // 转换为农历日期
+        yearStr = lunar.getYear().toString();
+        monthStr = lunar.getMonth() < 10 ? `0${lunar.getMonth()}` : lunar.getMonth().toString();
+        dayStr = lunar.getDay() < 10 ? `0${lunar.getDay()}` : lunar.getDay().toString();
+        hourStr = personInfo.value.hour < 10 ? `0${personInfo.value.hour}` : personInfo.value.hour.toString();
+        
+        console.log(`公历日期 ${personInfo.value.year}-${personInfo.value.month}-${personInfo.value.day} 已转换为农历 ${yearStr}-${monthStr}-${dayStr}`);
+      } catch (e) {
+        console.error('公历转农历失败:', e);
+        
+        // 如果转换失败，使用公历日期
+    const { year, month, day, hour } = personInfo.value;
+        yearStr = year.toString();
+        monthStr = month < 10 ? `0${month}` : month.toString();
+        dayStr = day < 10 ? `0${day}` : day.toString();
+        hourStr = hour < 10 ? `0${hour}` : hour.toString();
+      }
+    }
+    
+    // 保存农历日期数据，供后续对话使用
+    lunarBirthData.value = {
+      year: yearStr,
+      month: monthStr,
+      day: dayStr,
+      time: hourStr,
+      sex: personInfo.value.gender
+    };
+    
+    // 构建推送内容 - 使用用户选择的日期类型来显示
     let content = '请根据我的出生信息进行八字分析和命理测算';
     
     // 添加姓名（如果有）
@@ -578,8 +784,13 @@ const startDivination = async () => {
     // 添加性别
     content += `，性别：${personInfo.value.gender}`;
     
-    // 添加出生年月日时
-    content += `，出生时间：${yearStr}年${monthStr}月${dayStr}日${hourStr}时`;
+    // 添加出生年月日时 - 这里显示的是用户选择的原始日期类型
+    content += `，出生时间：${dateType}${personInfo.value.year}年${personInfo.value.month < 10 ? '0' : ''}${personInfo.value.month}月${personInfo.value.day < 10 ? '0' : ''}${personInfo.value.day}日${personInfo.value.hour < 10 ? '0' : ''}${personInfo.value.hour}时`;
+    
+    // 添加真太阳时和经纬度信息（如果有）
+    if (personInfo.value.useRealSolarTime && personInfo.value.longitude && personInfo.value.latitude) {
+      content += `，使用真太阳时，经度：${personInfo.value.longitude}，纬度：${personInfo.value.latitude}`;
+    }
     
     // 重新启用自动滚动
     autoScrollEnabled.value = true;
@@ -588,24 +799,22 @@ const startDivination = async () => {
     scrollToBottom(true);
     
     // 发送消息 - 传空会话ID，让后端创建新会话
-    await chatStore.sendMessage(content, [], {
-      // 传递输入参数给API
-      year: yearStr,
-      month: monthStr,
-      day: dayStr,
-      hour: hourStr,
-      time: hourStr,
-      gender: personInfo.value.gender,
-      name: personInfo.value.name || ''
-    });
+    // 无论用户选择公历还是农历，这里都发送转换后的农历日期
+    await chatStore.sendMessage(content, [], lunarBirthData.value);
     
-    // 如果消息发送成功并获得会话ID，保存会话状态
+    // 消息发送成功后，保存会话ID和个人信息
     if (chatStore.currentConversationId) {
-      // 保存个人信息以备后用
-      sessionStorage.setItem('destiny_person_info', JSON.stringify(personInfo.value));
-      
-      // 保存会话ID以便稍后恢复
       sessionStorage.setItem('destiny_conversation_id', chatStore.currentConversationId);
+      
+      // 保存个人信息
+      sessionStorage.setItem('destiny_person_info', JSON.stringify({
+        ...personInfo.value,
+        lunarDate: lunarDate.value,
+        isLunar: isLunarDate.value
+      }));
+      
+      // 单独存储农历出生数据，避免受到其他状态的影响
+      sessionStorage.setItem('destiny_lunar_birth_data', JSON.stringify(lunarBirthData.value));
       
       // 如果使用中间层，同步会话状态
       if (chatStore.isUsingMiddleLayer) {
@@ -613,7 +822,7 @@ const startDivination = async () => {
       }
     }
     
-    // 消息发送后再次滚动
+    // 发送后再次滚动到底部
     setTimeout(() => {
       scrollToBottom(true);
     }, 100);
@@ -691,17 +900,27 @@ const startDivination = async () => {
 // 继续与大师对话
 const continueDivination = () => {
   showResultModal.value = false;
+  // 更新全局弹窗状态
+  if (window.streamingState && typeof window.streamingState.setModalShowing === 'function') {
+    window.streamingState.setModalShowing(false);
+  }
   // 启用输入框，允许用户继续对话
   inputEnabled.value = true;
   
   // 添加明确的标记，表示用户已选择继续对话
   const hasCompletedFirstRound = true;
   
+  // 确保保存农历出生数据
+  if (lunarBirthData.value.year && lunarBirthData.value.month && lunarBirthData.value.day) {
+    sessionStorage.setItem('destiny_lunar_birth_data', JSON.stringify(lunarBirthData.value));
+  }
+  
   // 如果有中间层，更新状态
   if (chatStore.isUsingMiddleLayer && chatStore.currentConversationId) {
     swManager.updateSession(chatStore.currentConversationId, {
       hasCompletedFirstRound: true,
       inputEnabled: true,
+      lunarBirthData: lunarBirthData.value, // 更新农历数据
       last_updated: Date.now()
     });
   }
@@ -721,6 +940,10 @@ const continueDivination = () => {
 // 结束对话并返回主页
 const endDivination = () => {
   showResultModal.value = false;
+  // 更新全局弹窗状态
+  if (window.streamingState && typeof window.streamingState.setModalShowing === 'function') {
+    window.streamingState.setModalShowing(false);
+  }
   // 禁用输入框
   inputEnabled.value = false;
   
@@ -733,97 +956,13 @@ const endDivination = () => {
 };
 
 // 发送消息
-const sendMessage = async () => {
-  // 如果正在加载或输入被禁用，不处理
-  if (!inputEnabled.value || chatStore.isLoading) return;
-  
-  // 获取输入内容
-  const content = userInput.value.trim();
-  if (!content) return;
-  
-  // 清空输入框
-  userInput.value = '';
-  
-  try {
-    // 检查并修复可能错误的状态
-    if (chatStore.isLoading || chatStore.isStreaming || chatStore.isGenerating) {
-      console.warn('检测到不一致的状态，尝试自动修复');
-      
-      // 修正所有流式消息的状态
-      chatStore.messages.forEach(msg => {
-        if (msg.isStreaming) {
-          msg.isStreaming = false;
-          msg.content += '\n\n[系统自动修复：此消息在开始新对话前已标记为已完成]';
-        }
-      });
-      
-      // 强制重置所有状态变量
-      chatStore.isLoading = false;
-      chatStore.isStreaming = false;
-      chatStore.isGenerating = false;
-      chatStore.currentTask = null;
-    }
-    
-    // 重新启用自动滚动
-    autoScrollEnabled.value = true;
-    
-    // 滚动到底部确保用户可以看到新消息
-    scrollToBottom(true);
-    
-    // 如果使用中间层，确保同步
-    if (chatStore.isUsingMiddleLayer && chatStore.currentConversationId) {
-      if (!syncedWithMiddleLayer.value) {
-        try {
-          await syncWithMiddleLayer();
-        } catch (error) {
-          console.warn('同步到中间层失败，但将继续发送消息:', error);
-        }
-      }
-    }
-    
-    // 发送消息
-    await chatStore.sendMessage(content);
-    
-    // 消息发送成功后，保存会话ID和个人信息
-    if (chatStore.currentConversationId) {
-      sessionStorage.setItem('destiny_conversation_id', chatStore.currentConversationId);
-      sessionStorage.setItem('destiny_person_info', JSON.stringify(personInfo.value));
-      
-      // 如果使用中间层且尚未同步，执行同步
-      if (chatStore.isUsingMiddleLayer && !syncedWithMiddleLayer.value) {
-        await syncWithMiddleLayer();
-      }
-    }
-    
-    // 发送后再次滚动到底部
-    setTimeout(() => {
-      scrollToBottom(true);
-    }, 100);
-  } catch (error) {
-    console.error('发送消息失败:', error);
-    
-    // 如果是会话不存在错误，则清理会话ID
-    if (error.message && error.message.includes('Conversation Not Exists')) {
-      console.warn('会话不存在，清理会话ID');
-      await cleanupSession();
-    }
-    
-    // 显示错误消息给用户
-    if (messages.value && Array.isArray(messages.value)) {
-      messages.value.push({
-        id: crypto.randomUUID(),
-        conversation_id: chatStore.currentConversationId || '',
-        role: 'assistant',
-        content: `⚠️ 消息发送失败：${error.message || '网络连接错误'}`,
-        created_at: Date.now() / 1000,
-        isError: true
-      });
-    }
-    
-    // 尝试恢复用户输入内容
-    if (content && !userInput.value) {
-      userInput.value = content;
-    }
+const sendMessage = () => {
+  console.log('sendMessage被调用，当前输入内容:', userInput.value);
+  if (userInput.value && userInput.value.trim()) {
+    console.log('输入内容有效，调用sendUserMessage');
+    sendUserMessage(userInput.value);
+  } else {
+    console.log('输入内容为空，不发送消息');
   }
 };
 
@@ -842,8 +981,19 @@ onMounted(async () => {
     // 尝试从sessionStorage中恢复会话ID
     const sessionId = sessionStorage.getItem('destiny_conversation_id');
     const savedPersonInfo = sessionStorage.getItem('destiny_person_info');
+    const savedLunarBirthData = sessionStorage.getItem('destiny_lunar_birth_data');
     // 检查是否已完成第一轮对话
     const hasCompletedFirstRound = sessionStorage.getItem('destiny_has_completed') === 'true';
+
+    // 先恢复农历出生数据，这与会话状态无关
+    if (savedLunarBirthData) {
+      try {
+        lunarBirthData.value = JSON.parse(savedLunarBirthData);
+        console.log('已从sessionStorage直接恢复农历出生数据:', lunarBirthData.value);
+      } catch (e) {
+        console.error('恢复农历出生数据失败:', e);
+      }
+    }
 
     if (sessionId) {
       // 验证会话ID格式
@@ -863,78 +1013,105 @@ onMounted(async () => {
           await chatStore.fetchMessages(sessionId);
           console.log('获取命理消息完成，消息数量:', chatStore.messages.length);
           
-          // 记录所有消息的基本信息，帮助调试
-          console.log('[详细日志] 命理消息内容概览:', chatStore.messages.map(msg => ({
-            id: msg.id.substring(0, 8), // 只显示ID前8位
-            role: msg.role,
-            length: msg.content?.length || 0,
-            preview: msg.content?.substring(0, 30).replace(/\n/g, '\\n') || '',
-            isStreaming: msg.isStreaming
-          })));
-          
-          // 添加详细的消息格式检查
-          if (chatStore.messages.length > 0) {
-            console.log('[详细检查] 第一条消息完整信息:', {
-              id: chatStore.messages[0].id,
-              role: chatStore.messages[0].role,
-              content: chatStore.messages[0].content?.substring(0, 50),
-              isUser: chatStore.messages[0].role === 'user',
-              isAssistant: chatStore.messages[0].role === 'assistant'
-            });
-            
-            // 检查是否有assistant角色的消息
-            const hasAssistantMsg = chatStore.messages.some(msg => msg.role === 'assistant');
-            console.log('[详细检查] 是否包含AI消息:', hasAssistantMsg);
-            
-            // 检查渲染条件
-            const msgElement = document.querySelector('.flex.items-start');
-            if (msgElement) {
-              console.log('[详细检查] 第一条消息DOM:', msgElement.innerHTML.substring(0, 200));
-            }
-          }
-          
-          // 输出计算属性messages的当前状态
-          console.log('[详细日志] 命理页面计算属性messages当前长度:', messages.value.length);
-          
-          // 输出DOM状态
-          setTimeout(() => {
-            const messageElements = document.querySelectorAll('.flex.items-start');
-            console.log('[详细日志] 命理页面实际渲染的消息元素数量:', messageElements.length);
-            
-            // 检查消息容器是否存在
-            const container = document.querySelector('.space-y-6.pb-4');
-            console.log('[详细日志] 命理消息容器存在:', !!container, container);
-            
-            // 检查消息格式化组件
-            const formatters = document.querySelectorAll('message-formatter');
-            console.log('[详细日志] 命理页面消息格式化组件数量:', formatters.length);
-          }, 500);
-          
-          // 确保视图更新
-          if (chatStore.messages.length === 0) {
-            console.log('未检测到历史消息，添加临时测试消息');
-            // 如果没有消息，添加一条测试消息以便调试
-            chatStore.messages.push({
-              id: crypto.randomUUID(),
-              conversation_id: sessionId,
-              role: 'assistant',
-              content: '⚠️ 系统提示：检测到会话恢复异常，这是一条测试消息。请忽略此消息并尝试继续对话或刷新页面。',
-              created_at: Date.now() / 1000
-            });
-          } else {
-            console.log('检测到历史消息，强制刷新视图');
-            // 使用临时变量克隆消息数组，确保引用变化触发视图更新
-            const tempMessages = [...chatStore.messages];
-            chatStore.messages = [];
-            setTimeout(() => {
-              chatStore.messages = tempMessages;
-            }, 10);
-          }
-          
           // 恢复个人信息
           if (savedPersonInfo) {
             try {
-              personInfo.value = JSON.parse(savedPersonInfo);
+              const parsedInfo = JSON.parse(savedPersonInfo);
+              
+              // 恢复基本信息
+              personInfo.value = {
+                name: parsedInfo.name || '',
+                gender: parsedInfo.gender || '男',
+                year: parsedInfo.year || 1990,
+                month: parsedInfo.month || 1,
+                day: parsedInfo.day || 1,
+                hour: parsedInfo.hour || 12,
+                isLunar: parsedInfo.isLunar || false,
+                useRealSolarTime: parsedInfo.useRealSolarTime || false,
+                longitude: parsedInfo.longitude || 116.40,
+                latitude: parsedInfo.latitude || 39.90
+              };
+              
+              // 恢复日期类型选择
+              isLunarDate.value = parsedInfo.isLunar || false;
+              
+              // 恢复农历日期
+              if (parsedInfo.lunarDate) {
+                lunarDate.value = {
+                  year: parsedInfo.lunarDate.year || 1990,
+                  month: parsedInfo.lunarDate.month || 1,
+                  day: parsedInfo.lunarDate.day || 1,
+                  hour: parsedInfo.lunarDate.hour || personInfo.value.hour
+                };
+              } else if (isLunarDate.value) {
+                // 如果没有保存农历日期但选择了农历模式，则进行转换
+                try {
+                  const solar = Solar.fromYmd(personInfo.value.year, personInfo.value.month, personInfo.value.day);
+                  const lunar = solar.getLunar();
+                  
+                  lunarDate.value = {
+                    year: lunar.getYear(),
+                    month: lunar.getMonth(),
+                    day: lunar.getDay(),
+                    hour: personInfo.value.hour
+                  };
+                } catch (e) {
+                  console.error('恢复会话时公历转农历失败:', e);
+                }
+              }
+              
+              // 如果没有单独恢复的农历数据，但personInfo中有，作为备用方案
+              if (!savedLunarBirthData && parsedInfo.lunarBirthData) {
+                lunarBirthData.value = parsedInfo.lunarBirthData;
+                console.log('从personInfo恢复农历出生数据:', lunarBirthData.value);
+                
+                // 同时保存到单独的存储中，以便下次直接使用
+                sessionStorage.setItem('destiny_lunar_birth_data', JSON.stringify(lunarBirthData.value));
+              }
+              
+              // 如果仍然没有农历数据，重新计算
+              if (!lunarBirthData.value.year || !lunarBirthData.value.month || !lunarBirthData.value.day) {
+                console.log('未找到保存的农历数据，重新计算...');
+                if (isLunarDate.value) {
+                  // 如果是农历模式，直接使用农历日期
+                  lunarBirthData.value = {
+                    year: lunarDate.value.year.toString(),
+                    month: lunarDate.value.month < 10 ? `0${lunarDate.value.month}` : lunarDate.value.month.toString(),
+                    day: lunarDate.value.day < 10 ? `0${lunarDate.value.day}` : lunarDate.value.day.toString(),
+                    time: personInfo.value.hour < 10 ? `0${personInfo.value.hour}` : personInfo.value.hour.toString(),
+                    sex: personInfo.value.gender
+                  };
+                } else {
+                  // 如果是公历模式，尝试转换为农历
+                  try {
+                    const solar = Solar.fromYmd(personInfo.value.year, personInfo.value.month, personInfo.value.day);
+                    const lunar = solar.getLunar();
+                    
+                    lunarBirthData.value = {
+                      year: lunar.getYear().toString(),
+                      month: lunar.getMonth() < 10 ? `0${lunar.getMonth()}` : lunar.getMonth().toString(),
+                      day: lunar.getDay() < 10 ? `0${lunar.getDay()}` : lunar.getDay().toString(),
+                      time: personInfo.value.hour < 10 ? `0${personInfo.value.hour}` : personInfo.value.hour.toString(),
+                      sex: personInfo.value.gender
+                    };
+                  } catch (e) {
+                    console.error('恢复时公历转农历失败:', e);
+                    // 如果转换失败，使用公历日期
+                    lunarBirthData.value = {
+                      year: personInfo.value.year.toString(),
+                      month: personInfo.value.month < 10 ? `0${personInfo.value.month}` : personInfo.value.month.toString(),
+                      day: personInfo.value.day < 10 ? `0${personInfo.value.day}` : personInfo.value.day.toString(),
+                      time: personInfo.value.hour < 10 ? `0${personInfo.value.hour}` : personInfo.value.hour.toString(),
+                      sex: personInfo.value.gender
+                    };
+                  }
+                }
+                console.log('重新计算的农历数据:', lunarBirthData.value);
+                
+                // 保存重新计算的农历数据
+                sessionStorage.setItem('destiny_lunar_birth_data', JSON.stringify(lunarBirthData.value));
+              }
+              
             } catch (e) {
               console.error('恢复个人信息失败:', e);
             }
@@ -954,24 +1131,33 @@ onMounted(async () => {
           }
           
           // 尝试从中间层恢复会话中的消息
-          if (chatStore.isUsingMiddleLayer) {
-            try {
-              const restored = await chatStore.tryRestoreSessionFromMiddleLayer();
-              if (restored) {
+    if (chatStore.isUsingMiddleLayer) {
+      try {
+        const restored = await chatStore.tryRestoreSessionFromMiddleLayer();
+        if (restored) {
                 console.log('成功从中间层恢复命理会话消息');
                 syncedWithMiddleLayer.value = true;
-                
+          
                 // 尝试获取中间层保存的个人信息和输入框状态
-                const sessionData = await swManager.getSession(chatStore.currentConversationId);
+          const sessionData = await swManager.getSession(chatStore.currentConversationId);
                 if (sessionData) {
                   if (sessionData.personInfo) {
-                    personInfo.value = sessionData.personInfo;
+            personInfo.value = sessionData.personInfo;
                     console.log('已从中间层恢复个人信息');
+                  }
+                  
+                  // 恢复农历数据
+                  if (sessionData.lunarBirthData) {
+                    lunarBirthData.value = sessionData.lunarBirthData;
+                    console.log('已从中间层恢复农历出生数据:', lunarBirthData.value);
+                    
+                    // 同时保存到sessionStorage，确保数据同步
+                    sessionStorage.setItem('destiny_lunar_birth_data', JSON.stringify(lunarBirthData.value));
                   }
                   
                   // 检查中间层是否有明确的完成状态标记
                   if (sessionData.hasCompletedFirstRound === true) {
-                    inputEnabled.value = true;
+              inputEnabled.value = true;
                     // 同步到sessionStorage
                     sessionStorage.setItem('destiny_has_completed', 'true');
                     console.log('已从中间层恢复完成状态：用户已完成第一轮对话');
@@ -991,11 +1177,11 @@ onMounted(async () => {
                     console.log('检测到流式消息，已标记为完成');
                   }
                 });
-              } else {
+                } else {
                 // 同步到中间层
                 await syncWithMiddleLayer();
-              }
-            } catch (e) {
+                }
+              } catch (e) {
               console.warn('从中间层恢复命理会话失败:', e);
             }
           }
@@ -1007,15 +1193,15 @@ onMounted(async () => {
           chatStore.currentTask = null;
           
           console.log('命理会话恢复完成，状态已重置，输入框状态:', inputEnabled.value);
-        } catch (error) {
-          console.warn('恢复命理会话失败:', error);
-          
-          // 如果是会话不存在错误，则清理会话ID
-          if (error.message && error.message.includes('Conversation Not Exists')) {
-            await cleanupSession();
+          } catch (error) {
+            console.warn('恢复命理会话失败:', error);
+            
+            // 如果是会话不存在错误，则清理会话ID
+            if (error.message && error.message.includes('Conversation Not Exists')) {
+              await cleanupSession();
             sessionLoaded = false;
+            }
           }
-        }
       } else {
         console.warn('命理会话ID格式不正确:', sessionId);
         sessionStorage.removeItem('destiny_conversation_id');
@@ -1059,7 +1245,7 @@ onMounted(async () => {
       
       // 初始滚动到底部
       if (chatStore.messages.length > 0) {
-        scrollToBottom(true);
+      scrollToBottom(true);
       }
     });
     
@@ -1071,6 +1257,264 @@ onMounted(async () => {
     
     // 标记组件为已就绪
     isComponentReady.value = true;
+    
+    // 在会话恢复完成后，添加额外的状态检查
+    setTimeout(() => {
+      console.log('命理会话恢复完成后状态检查：', {
+        inputEnabled: inputEnabled.value,
+        isGenerating: chatStore.isGenerating,
+        isStreaming: chatStore.isStreaming,
+        isLoading: chatStore.isLoading,
+        messageCount: messages.value.length
+      });
+      
+      // 确保状态一致性
+      chatStore.isLoading = false;
+      chatStore.isStreaming = false;
+      chatStore.isGenerating = false;
+      chatStore.currentTask = null;
+      
+      // 再次确认输入框是否启用
+      if (sessionStorage.getItem('destiny_has_completed') === 'true') {
+        console.log('检测到用户已完成第一轮对话，再次确认输入框已启用');
+        inputEnabled.value = true;
+      }
+    }, 1000);
+    
+    // 添加定期检查状态的定时器，确保状态不会卡住
+    const statusCheckInterval = setInterval(() => {
+      // 检查是否有流式消息但已经超过15秒
+      const streamingMessages = messages.value.filter(msg => msg.isStreaming);
+      if (streamingMessages.length > 0) {
+        // 如果有流式消息但isStreaming状态为false，修复不一致性
+        if (!chatStore.isStreaming) {
+          console.warn('检测到状态不一致：有流式消息但isStreaming为false，修复状态');
+          chatStore.isStreaming = true;
+        }
+        
+        // 检查最老的流式消息的时间
+        const oldestStreamingMsg = streamingMessages.reduce((oldest, current) => {
+          return (!oldest.created_at || current.created_at < oldest.created_at) ? current : oldest;
+        }, {});
+        
+        // 如果最老的流式消息已超过15秒，认为是卡住了
+        const now = Date.now() / 1000;
+        if (oldestStreamingMsg.created_at && (now - oldestStreamingMsg.created_at > 15)) {
+          console.warn('检测到流式消息卡住超过15秒，自动标记为完成');
+          
+          // 修复所有流式消息
+          messages.value.forEach(msg => {
+            if (msg.isStreaming) {
+              msg.isStreaming = false;
+              msg.content += '\n\n[系统自动修复：此消息已标记为完成]';
+            }
+          });
+          
+          // 重置所有状态
+          chatStore.isLoading = false;
+          chatStore.isStreaming = false;
+          chatStore.isGenerating = false;
+          chatStore.currentTask = null;
+        }
+      } else if (chatStore.isStreaming || chatStore.isGenerating) {
+        // 如果没有流式消息但状态还在，认为是状态卡住了
+        console.warn('检测到状态卡住：没有流式消息但状态为streaming/generating，重置状态');
+        chatStore.isLoading = false;
+        chatStore.isStreaming = false;
+        chatStore.isGenerating = false;
+        chatStore.currentTask = null;
+      }
+    }, 5000); // 每5秒检查一次
+    
+    // 在组件卸载时清理
+    onBeforeUnmount(() => {
+      clearInterval(statusCheckInterval);
+    });
+    
+    // 添加全局错误处理
+    window.addEventListener('error', (event) => {
+      console.error('捕获到全局错误:', event.error);
+      
+      // 确保状态重置
+      if (chatStore.isStreaming || chatStore.isGenerating || chatStore.isLoading) {
+        console.warn('错误发生时重置所有状态');
+        chatStore.isLoading = false;
+        chatStore.isStreaming = false;
+        chatStore.isGenerating = false;
+        chatStore.currentTask = null;
+      }
+    });
+    
+    // 添加诊断功能 - 点击三次Logo触发
+    let logoClickCount = 0;
+    let logoClickTimer = null;
+    
+    const handleLogoClick = () => {
+      logoClickCount++;
+      
+      clearTimeout(logoClickTimer);
+      logoClickTimer = setTimeout(() => {
+        logoClickCount = 0;
+      }, 2000);
+      
+      if (logoClickCount >= 3) {
+        logoClickCount = 0;
+        
+        // 显示诊断信息
+        const diagInfo = {
+          currentConversationId: chatStore.currentConversationId,
+          inputEnabled: inputEnabled.value,
+          isStreaming: chatStore.isStreaming,
+          isGenerating: chatStore.isGenerating,
+          isLoading: chatStore.isLoading,
+          messagesCount: chatStore.messages.length,
+          lunarDataValid: !!(lunarBirthData.value && lunarBirthData.value.year),
+          hostname: window.location.hostname,
+          sessionStorageKeys: Object.keys(sessionStorage),
+          browserInfo: navigator.userAgent
+        };
+        
+        console.log('=== 诊断信息 ===', diagInfo);
+        alert('诊断信息已打印到控制台');
+        
+        // 提供重置功能
+        if (confirm('是否重置当前会话状态？（这将清除当前对话）')) {
+          cleanupSession();
+          setTimeout(() => {
+            window.location.reload();
+          }, 500);
+        }
+      }
+    };
+    
+    // 为页面Logo添加点击事件
+    const logoElement = document.querySelector('.logo') || document.querySelector('h1');
+    if (logoElement) {
+      logoElement.style.cursor = 'pointer';
+      logoElement.addEventListener('click', handleLogoClick);
+    }
+    
+    // 测试按钮点击监听
+    const sendButton = document.querySelector('button i.fa-paper-plane');
+    if (sendButton && sendButton.parentNode) {
+      console.log('为发送按钮添加直接点击监听');
+      sendButton.parentNode.addEventListener('click', () => {
+        console.log('发送按钮被直接点击 (事件监听)');
+        if (userInput.value.trim() && inputEnabled.value && !chatStore.isStreaming) {
+          console.log('条件满足，手动调用sendUserMessage');
+          sendUserMessage(userInput.value);
+        } else {
+          console.log('点击条件不满足:', {
+            hasInput: !!userInput.value.trim(),
+            inputEnabled: inputEnabled.value, 
+            notStreaming: !chatStore.isStreaming
+          });
+        }
+      });
+    }
+    
+    // 使用timeout确保页面已渲染
+    setTimeout(() => {
+      const sendButton = document.getElementById('destinyMessageSendButton');
+      if (sendButton) {
+        sendButton.onclick = () => {
+          console.log('通过直接onclick处理发送按钮点击');
+          if (userInput.value.trim() && inputEnabled.value) {
+            sendUserMessage(userInput.value);
+          }
+        };
+      }
+    }, 1000);
+    
+    // 设置日期选择器默认日期
+    initDefaultDate();
+    
+    // 设置应用类型
+    await chatStore.setAppType(chatAPI.APP_TYPES.DESTINY);
+    
+    // 获取本地或永久存储中的阳历出生数据
+    getStoredBirthInfo();
+    
+    // 确保Service Worker就绪
+    swManager.initServiceWorker().then(() => {
+      isServiceWorkerReady.value = true;
+      console.log('Service Worker准备就绪');
+    });
+    
+    // 恢复上次会话
+    if (shouldRestoreSession.value) {
+      setTimeout(async () => {
+        await tryRestoreLastSession();
+      }, 500);
+    }
+    
+    // 组件准备就绪
+    isComponentReady.value = true;
+    
+    // 添加页面可见性监听
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // 安全起见，定期检查输入状态和发送按钮状态
+    statusCheckInterval.value = setInterval(() => {
+      if (chatStore.isLoading && Date.now() - lastMessageTime.value > 15000) {
+        console.log('检测到可能的加载状态卡住，重置状态');
+        chatStore.isLoading = false;
+        chatStore.isStreaming = false;
+        chatStore.isGenerating = false;
+      }
+    }, 5000);
+    
+    // 添加直接的DOM事件监听，确保按钮点击事件能被捕获
+    setTimeout(() => {
+      const sendButton = document.getElementById('sendButton');
+      if (sendButton) {
+        console.log('为发送按钮添加直接DOM监听');
+        sendButton.addEventListener('click', (event) => {
+          console.log('按钮DOM事件被触发');
+          // 防止事件冒泡和默认行为
+          event.stopPropagation();
+          event.preventDefault();
+          
+          // 检查按钮是否应该被禁用
+          if (!sendButton.disabled && userInput.value.trim()) {
+            console.log('按钮有效，直接调用发送函数');
+            doSendMessage();
+          } else {
+            console.log('按钮无效或输入为空，不发送消息');
+          }
+        });
+        console.log('发送按钮DOM监听已添加');
+      } else {
+        console.warn('无法找到发送按钮元素');
+      }
+    }, 1000); // 给DOM一些时间来渲染
+    
+    // 添加简单的状态检测机制，每10秒检查一次界面状态
+    statusCheckInterval.value = setInterval(() => {
+      // 检测是否可能存在卡住的状态
+      const now = Date.now();
+      const timeSinceLastMessage = now - lastMessageTime.value;
+      
+      // 如果加载状态持续超过20秒而没有更新，强制重置
+      if (chatStore.isLoading && timeSinceLastMessage > 20000) {
+        console.log('检测到可能的状态卡住，自动重置:', {
+          timeSinceLastMessage: Math.floor(timeSinceLastMessage / 1000) + '秒',
+          isLoading: chatStore.isLoading,
+          isStreaming: chatStore.isStreaming
+        });
+        
+        // 重置状态
+        chatStore.isLoading = false;
+        chatStore.isStreaming = false;
+        chatStore.isGenerating = false;
+        
+        // 重置发送状态
+        isSendingMessage = false;
+      }
+    }, 10000);
+    
+    // 组件准备就绪标记
+    isComponentReady.value = true;
   } catch (error) {
     console.error('命理页面初始化失败:', error);
     inputEnabled.value = false; // 出错时禁用输入框
@@ -1080,6 +1524,33 @@ onMounted(async () => {
     
     isComponentReady.value = true; // 即使失败也设置为就绪，允许用户操作
   }
+});
+
+// 在onBeforeUnmount钩子中清理事件监听
+onBeforeUnmount(() => {
+  // 现有代码...
+  
+  // 清理页面可见性监听
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+  
+  // 清理状态检查定时器
+  if (statusCheckInterval.value) {
+    clearInterval(statusCheckInterval.value);
+  }
+  
+  // 重置全局弹窗状态
+  if (window.streamingState && typeof window.streamingState.setModalShowing === 'function' && showResultModal.value) {
+    window.streamingState.setModalShowing(false);
+  }
+  
+  // 如果用户离开命理页面，标记完成会话
+  if (chatStore.currentConversationId) {
+    swManager.completeSession(chatStore.currentConversationId).then(() => {
+      console.log('命理会话已标记为完成');
+    });
+  }
+  
+  console.log('命理组件已卸载，资源已清理');
 });
 
 // 格式化结果内容
@@ -1211,6 +1682,10 @@ watch(showResultModal, (newValue) => {
     console.log('命理结果弹窗显示，标记会话完成');
     swManager.completeSession(chatStore.currentConversationId);
   }
+  // 当结果弹窗显示或隐藏时，更新全局状态
+  if (window.streamingState && typeof window.streamingState.setModalShowing === 'function') {
+    window.streamingState.setModalShowing(newValue);
+  }
 });
 
 // 处理会话被其他标签页替换的情况
@@ -1248,28 +1723,78 @@ const syncWithMiddleLayer = async () => {
       return;
     }
     
-    // 注册会话到中间层
+    // 确保有有效的农历数据
+    if (!lunarBirthData.value.year || !lunarBirthData.value.month || !lunarBirthData.value.day) {
+      console.warn('同步中间层前发现农历数据不完整，尝试重新计算');
+      
+      // 根据当前模式重新计算
+      if (isLunarDate.value) {
+        // 使用农历日期
+        lunarBirthData.value = {
+          year: lunarDate.value.year.toString(),
+          month: lunarDate.value.month < 10 ? `0${lunarDate.value.month}` : lunarDate.value.month.toString(),
+          day: lunarDate.value.day < 10 ? `0${lunarDate.value.day}` : lunarDate.value.day.toString(),
+          time: personInfo.value.hour < 10 ? `0${personInfo.value.hour}` : personInfo.value.hour.toString(),
+          sex: personInfo.value.gender
+        };
+      } else {
+        try {
+          // 尝试公历转农历
+          const solar = Solar.fromYmd(personInfo.value.year, personInfo.value.month, personInfo.value.day);
+          const lunar = solar.getLunar();
+          
+          lunarBirthData.value = {
+            year: lunar.getYear().toString(),
+            month: lunar.getMonth() < 10 ? `0${lunar.getMonth()}` : lunar.getMonth().toString(),
+            day: lunar.getDay() < 10 ? `0${lunar.getDay()}` : lunar.getDay().toString(),
+            time: personInfo.value.hour < 10 ? `0${personInfo.value.hour}` : personInfo.value.hour.toString(),
+            sex: personInfo.value.gender
+          };
+        } catch (e) {
+          console.error('同步中间层时计算农历数据失败:', e);
+          
+          // 使用公历数据
+          lunarBirthData.value = {
+            year: personInfo.value.year.toString(),
+            month: personInfo.value.month < 10 ? `0${personInfo.value.month}` : personInfo.value.month.toString(),
+            day: personInfo.value.day < 10 ? `0${personInfo.value.day}` : personInfo.value.day.toString(),
+            time: personInfo.value.hour < 10 ? `0${personInfo.value.hour}` : personInfo.value.hour.toString(),
+            sex: personInfo.value.gender
+          };
+        }
+      }
+      
+      // 保存重新计算的农历数据
+      sessionStorage.setItem('destiny_lunar_birth_data', JSON.stringify(lunarBirthData.value));
+    }
+    
+    // 注册会话
     await swManager.registerSession(chatStore.currentConversationId, {
       type: 'destiny-assistant',
-      name: '命理算师',
-      description: '八字命理分析',
-      created_at: Date.now(),
-      personInfo: personInfo.value // 保存个人信息
-    });
-    
-    // 更新会话数据
-    await swManager.updateSession(chatStore.currentConversationId, {
+      userId: chatStore.userId,
       messages: chatStore.sortedMessages,
-      last_updated: Date.now()
+      personInfo: {
+        ...personInfo.value,
+        lunarDate: lunarDate.value,
+        isLunar: isLunarDate.value
+      },
+      lunarBirthData: lunarBirthData.value, // 单独保存农历数据
+      inputEnabled: inputEnabled.value,
+      hasCompletedFirstRound: inputEnabled.value,
+      created_at: Date.now()
     });
     
-    // 添加会话监听器
-    swManager.addSessionListener(chatStore.currentConversationId, handleSessionUpdate);
+    // 设置监听器
+    await swManager.addSessionListener(chatStore.currentConversationId, handleSessionUpdate);
     
-    console.log('命理分析会话已同步到中间层:', chatStore.currentConversationId);
+    // 标记为已同步
+    syncedWithMiddleLayer.value = true;
+    console.log('命理会话已同步到中间层:', chatStore.currentConversationId);
+    
+    return true;
   } catch (error) {
     console.error('同步到中间层失败:', error);
-    // 继续操作，即使同步失败
+    return false;
   }
 };
 
@@ -1314,6 +1839,9 @@ const cleanupSession = async () => {
     // 重置输入框状态
     inputEnabled.value = false;
     
+    // 清理农历出生数据
+    sessionStorage.removeItem('destiny_lunar_birth_data');
+    
     console.log('命理会话已完全清理，准备重新开始对话');
     return true;
   } catch (error) {
@@ -1345,26 +1873,15 @@ const handleVisibilityChange = async () => {
       try {
         // 检查会话是否存在于sessionStorage中
         const storedId = sessionStorage.getItem('destiny_conversation_id');
-        // 检查是否已完成第一轮对话
-        const hasCompletedFirstRound = sessionStorage.getItem('destiny_has_completed') === 'true';
         
         if (storedId !== chatStore.currentConversationId) {
-          console.log('会话ID不匹配，更新到sessionStorage', {
-            stored: storedId,
-            current: chatStore.currentConversationId
-          });
           sessionStorage.setItem('destiny_conversation_id', chatStore.currentConversationId);
-          
-          // 同时确保个人信息也被更新
-          sessionStorage.setItem('destiny_person_info', JSON.stringify(personInfo.value));
         }
         
         // 检查是否有处于流式状态的消息
         const hasStreamingMessage = chatStore.messages.some(msg => msg.isStreaming);
         
         if (hasStreamingMessage) {
-          console.log('检测到有流式消息，页面切换回来时自动标记为完成');
-          
           // 修正所有流式消息的状态
           chatStore.messages.forEach(msg => {
             if (msg.isStreaming) {
@@ -1379,33 +1896,9 @@ const handleVisibilityChange = async () => {
           chatStore.isGenerating = false;
           chatStore.currentTask = null;
         }
-        
-        // 检查会话状态，决定是否启用输入框
-        if (hasCompletedFirstRound) {
-          // 明确标记已完成第一轮对话
-          inputEnabled.value = true;
-          console.log('页面恢复可见，检测到用户已完成第一轮对话，启用输入框');
-        } else if (messages.value.length >= 2) {
-          // 兼容旧逻辑：已经完成了第一轮算命且有多条消息，说明用户已经选择了继续对话
-          inputEnabled.value = true;
-          console.log('页面恢复可见，检测到多条消息，启用输入框');
-        } else if (showResultModal.value) {
-          // 正在显示结果弹窗，输入框应该保持禁用
-          inputEnabled.value = false;
-          console.log('页面恢复可见，正在显示结果弹窗，保持输入框禁用');
-        }
-        
-        // 如果使用中间层，检查会话是否同步
-        if (chatStore.isUsingMiddleLayer && !syncedWithMiddleLayer.value) {
-          await syncWithMiddleLayer();
-        }
       } catch (error) {
         console.warn('页面恢复可见时同步会话状态失败:', error);
       }
-    } else {
-      // 没有会话ID，应该禁用输入框
-      inputEnabled.value = false;
-      console.log('页面恢复可见，没有有效会话，禁用输入框');
     }
     
     // 重新检查API连接状态
@@ -1417,32 +1910,159 @@ const handleVisibilityChange = async () => {
   } else if (document.visibilityState === 'hidden') {
     // 页面隐藏时，确保会话ID被保存
     if (chatStore.currentConversationId) {
-      console.log('命理算师页面隐藏，保存会话状态');
       sessionStorage.setItem('destiny_conversation_id', chatStore.currentConversationId);
       
       // 同时保存个人信息
       sessionStorage.setItem('destiny_person_info', JSON.stringify(personInfo.value));
+    }
+  }
+};
+
+// 添加一个存储转换后的农历日期数据的变量
+const lunarBirthData = ref({
+  year: '',
+  month: '',
+  day: '',
+  time: '',
+  sex: ''
+});
+
+// 覆盖默认的发消息方法，确保每次都发送出生信息
+const sendUserMessage = async (message) => {
+  console.log('发送按钮被点击，内容:', message);
+  
+  // 先保存消息内容，防止后续变量丢失
+  const messageContent = message && message.trim ? message.trim() : '';
+  
+  if (!messageContent) {
+    console.log('消息内容为空，不发送');
+    return;
+  }
+  
+  if (!chatStore.currentConversationId) {
+    console.warn('没有有效的命理会话ID，无法发送消息');
+    alert('会话已失效，请刷新页面重试');
+    return;
+  }
+  
+  // 备份消息内容，确保后续处理中不会丢失
+  const secureMessageContent = messageContent;  
+  console.log('准备发送消息，内容:', secureMessageContent.substring(0, 30) + (secureMessageContent.length > 30 ? '...' : ''));
+  
+  try {
+    // 简单检查农历数据完整性
+    if (!lunarBirthData.value.year || !lunarBirthData.value.sex) {
+      console.warn('农历数据不完整，尝试从sessionStorage恢复');
       
-      // 保存完成状态标记
-      if (inputEnabled.value) {
-        sessionStorage.setItem('destiny_has_completed', 'true');
-      }
-      
-      // 如果使用中间层，确保最新状态已同步
-      if (chatStore.isUsingMiddleLayer && syncedWithMiddleLayer.value) {
-        try {
-          await swManager.updateSession(chatStore.currentConversationId, {
-            messages: chatStore.sortedMessages,
-            personInfo: personInfo.value,
-            inputEnabled: inputEnabled.value,
-            hasCompletedFirstRound: inputEnabled.value, // 如果输入框已启用，表示已完成第一轮
-            last_updated: Date.now()
-          });
-        } catch (error) {
-          console.warn('页面隐藏时同步到中间层失败:', error);
-        }
+      // 尝试从sessionStorage恢复
+      const savedLunarBirthData = sessionStorage.getItem('destiny_lunar_birth_data');
+      if (savedLunarBirthData) {
+        lunarBirthData.value = JSON.parse(savedLunarBirthData);
+        console.log('已恢复农历数据');
+      } else {
+        // 使用基本值确保命令能继续
+        lunarBirthData.value = {
+          year: personInfo.value.year.toString(),
+          month: personInfo.value.month < 10 ? `0${personInfo.value.month}` : personInfo.value.month.toString(),
+          day: personInfo.value.day < 10 ? `0${personInfo.value.day}` : personInfo.value.day.toString(),
+          time: personInfo.value.hour < 10 ? `0${personInfo.value.hour}` : personInfo.value.hour.toString(),
+          sex: personInfo.value.gender
+        };
+        console.log('使用基本数据');
       }
     }
+    
+    // 重置任何可能的卡住状态
+    chatStore.isGenerating = false;
+    chatStore.isStreaming = false;
+    chatStore.isLoading = false;
+    
+    // 记录调试信息
+    console.log('发送命理消息, 附带数据:', {
+      conversation_id: chatStore.currentConversationId,
+      content: secureMessageContent.substring(0, 30) + '...',
+      birthData: lunarBirthData.value
+    });
+    
+    // 先在UI中显示用户消息 (让chatStore来处理添加用户消息)
+    // 清空输入框提前完成，提供即时反馈
+    userInput.value = '';
+    
+    // 更新最后消息时间
+    lastMessageTime.value = Date.now();
+    
+    // 记录当前消息数量，用于后续检查
+    const initialMessageCount = chatStore.messages.length;
+    
+    // 使用chatStore发送消息
+    console.log('调用chatStore.sendMessage发送消息，消息长度:', secureMessageContent.length);
+    await chatStore.sendMessage(secureMessageContent, [], lunarBirthData.value);
+    
+    const finalMessageCount = chatStore.messages.length;
+    console.log('命理消息发送处理完成，消息数量变化:', {
+      before: initialMessageCount,
+      after: finalMessageCount,
+      diff: finalMessageCount - initialMessageCount
+    });
+    
+    // 检查是否有新消息添加
+    if (finalMessageCount <= initialMessageCount) {
+      console.warn('消息可能未正确处理，未检测到新助手消息');
+    }
+    
+    // 检查最后一条消息是否为助手消息
+    const lastMessage = chatStore.messages[chatStore.messages.length - 1];
+    if (lastMessage && lastMessage.role === 'assistant') {
+      console.log('收到助手回复，内容长度:', lastMessage.content.length);
+    }
+    
+    // 滚动到底部
+    setTimeout(() => {
+      scrollToBottom(true);
+    }, 100);
+  } catch (error) {
+    console.error('发送命理消息失败:', error);
+    alert('发送消息失败，请稍后再试');
+    
+    // 确保状态重置
+    chatStore.isLoading = false;
+    chatStore.isStreaming = false;
+    chatStore.isGenerating = false;
+  }
+};
+
+// 添加简单的防抖动变量
+let isSendingMessage = false;
+
+// 添加一个简单明了的发送函数
+const doSendMessage = () => {
+  console.log('doSendMessage被调用，准备发送消息');
+  
+  // 防止重复点击或在加载状态下点击
+  if (isSendingMessage || chatStore.isLoading || chatStore.isStreaming || chatStore.isGenerating) {
+    console.log('消息正在发送中，忽略重复点击', {
+      isSending: isSendingMessage,
+      isLoading: chatStore.isLoading
+    });
+    return;
+  }
+  
+  // 检查输入是否有效
+  const trimmedInput = userInput.value.trim();
+  if (trimmedInput) {
+    // 设置发送状态
+    isSendingMessage = true;
+    
+    // 使用当前输入内容调用发送函数
+    sendUserMessage(trimmedInput)
+      .finally(() => {
+        // 3秒后重置状态，防止连续快速点击
+        setTimeout(() => {
+          isSendingMessage = false;
+        }, 3000);
+      });
+  } else {
+    console.log('输入内容为空，不执行发送');
   }
 };
 </script>
@@ -1638,5 +2258,33 @@ const handleVisibilityChange = async () => {
   padding: 0.75em;
   border-radius: 6px;
   margin-bottom: 1em;
+}
+
+/* 修复移动端弹窗样式 */
+@media (max-width: 767px) {
+  /* 提高弹窗和输入框的可点击区域和可见性 */
+  input, select, button {
+    font-size: 16px !important; /* 避免iOS缩放 */
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 4px;
+  }
+  
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6' viewBox='0 0 8 6'%3E%3Cpath fill='%23FFF' d='M0 0h8L4 6z'/%3E%3C/svg%3E");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    padding-right: 1.5rem;
+  }
+  
+  /* 增大点击区域 */
+  button {
+    min-height: 44px;
+  }
+  
+  /* 确保内容在视口内可滚动 */
+  .custom-scrollbar {
+    -webkit-overflow-scrolling: touch;
+  }
 }
 </style>

@@ -4,12 +4,12 @@
     <template v-if="!isFullPage">
       <div class="flex min-h-screen bg-[#04031e] relative">
         <!-- 左侧导航 - 使用固定定位，保持独立滚动 -->
-        <div class="fixed left-0 top-0 bottom-0 z-[9999] h-screen w-60">
+        <div class="fixed left-0 top-0 bottom-0 z-50 h-screen md:w-60">
           <Sidebar />
         </div>
         
         <!-- 右侧内容区 - 独立滚动区域 -->
-        <div class="md:ml-60 flex-1 w-full min-h-screen bg-[#04031e] overflow-x-hidden">
+        <div class="md:ml-60 w-full min-h-screen bg-[#04031e] overflow-x-hidden pt-16 md:pt-0">
           <router-view />
         </div>
       </div>
@@ -57,5 +57,17 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+}
+
+/* 移动端优化 */
+@media (max-width: 767px) {
+  input, select, textarea, button {
+    font-size: 16px; /* 避免iOS缩放 */
+  }
+  
+  .app-container * {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 </style> 

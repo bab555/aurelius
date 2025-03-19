@@ -519,23 +519,20 @@ const testConnection = async () => {
   await chatStore.checkConnection()
 }
 
-// 生命周期钩子注册 - 提前注册所有钩子
+// 生命周期钩子注册
 onBeforeUnmount(() => {
   try {
     // 如果有活跃会话且使用中间层，标记会话完成
     if (chatStore.isUsingMiddleLayer && chatStore.currentConversationId && syncedWithMiddleLayer.value) {
       try {
-        console.log('企业助手页面卸载，标记会话完成并清理资源', chatStore.currentConversationId);
+        console.log('企业助手页面卸载，标记会话完成', chatStore.currentConversationId);
         swManager.completeSession(chatStore.currentConversationId);
-        swManager.clearSession(chatStore.currentConversationId);
       } catch (error) {
         console.error('标记会话完成失败:', error);
       }
     }
     
     // 移除事件监听器
-    window.removeEventListener('focus', handleWindowFocus);
-    window.removeEventListener('blur', handleWindowBlur);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
     
     // 保存会话ID到sessionStorage

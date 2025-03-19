@@ -3,7 +3,7 @@
     <!-- 移动端菜单按钮 -->
     <button 
       @click="isMenuOpen = !isMenuOpen" 
-      class="md:hidden fixed top-6 left-6 z-[1000] w-10 h-10 bg-primary/20 text-white rounded-lg flex items-center justify-center"
+      class="md:hidden fixed top-4 left-4 z-[1001] w-10 h-10 bg-primary/20 text-white rounded-lg flex items-center justify-center"
     >
       <i :class="isMenuOpen ? 'fas fa-times' : 'fas fa-bars'"></i>
     </button>
@@ -11,13 +11,13 @@
     <!-- 移动端菜单遮罩 -->
     <div 
       v-if="isMenuOpen" 
-      class="fixed inset-0 bg-black/70 z-[900] md:hidden"
+      class="fixed inset-0 bg-black/80 z-[1000] md:hidden"
       @click="isMenuOpen = false"
     ></div>
     
     <!-- 侧边导航 -->
     <nav 
-      class="w-72 md:w-60 bg-[#04031e] h-full flex flex-col z-[9999] transition-all duration-300 shadow-xl"
+      class="w-72 md:w-60 bg-[#04031e] h-full flex flex-col z-[1000] transition-all duration-300 shadow-xl fixed md:relative left-0 top-0 transform"
       :class="{'translate-x-0': isMenuOpen, '-translate-x-full': !isMenuOpen, 'md:translate-x-0': true}"
     >
       <!-- Logo -->
@@ -73,7 +73,7 @@
                 @click.prevent="handleNavClick('/assistant/solution', $event)"
               >
                 <i class="far fa-edit w-5 h-5 flex items-center justify-center mr-2"></i>
-                <span>方案助手</span>
+                <span>写作助手</span>
               </a>
               <a 
                 href="/assistant/image" 
@@ -467,14 +467,16 @@ onMounted(() => {
   cursor: pointer !important;
   pointer-events: auto !important;
   position: relative;
-  z-index: 11000 !important; /* 使用更高的z-index确保优先级 */
+  z-index: 1 !important; /* 降低z-index避免层级过高 */
   backface-visibility: hidden; /* 减少渲染问题 */
   will-change: transform; /* 优化动画性能 */
+  -webkit-tap-highlight-color: transparent; /* 移除移动端点击高亮 */
+  touch-action: manipulation; /* 改善触摸体验 */
 }
 
 .sidebar-component {
   position: relative;
-  z-index: 10000;
+  z-index: 1000;
   transform: translateZ(0); /* 启用GPU加速 */
   will-change: transform; /* 优化动画性能 */
   isolation: isolate; /* 创建新的堆叠上下文 */
@@ -493,22 +495,17 @@ onMounted(() => {
 .sidebar-scroll {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  -webkit-overflow-scrolling: touch; /* 改善iOS滚动体验 */
 }
 
 .sidebar-scroll::-webkit-scrollbar {
   width: 4px;
 }
 
-.sidebar-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.sidebar-scroll::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-}
-
-.sidebar-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.3);
+/* 移动端优化样式 */
+@media (max-width: 767px) {
+  .sidebar-component nav {
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+  }
 }
 </style> 

@@ -849,83 +849,6 @@ export const useChatStore = defineStore('chat', () => {
     }
   };
   
-  // 更新版本 - 接收原始响应内容
-  const handleStreamEnd = (rawResponse = '') => {
-    // 存储原始响应
-    lastRawResponse.value = rawResponse;
-    logDebug('流响应原始内容', { length: rawResponse.length });
-
-    // 结束加载状态
-    isLoading.value = false;
-    
-    // 如果我们有了新的会话ID，刷新会话列表
-    if (currentConversationId.value) {
-      fetchConversations();
-    }
-  };
-  
-  // 保存对话ID和处理本地存储
-  const handleConversationId = (id) => {
-    console.log('处理会话ID:', id);
-    if (!id) return false;
-    
-    const oldId = currentConversationId.value;
-    
-    // 设置新的会话ID
-    currentConversationId.value = id;
-    logDebug('设置会话ID', { conversation_id: id, oldId });
-    
-    // 根据应用类型保存到不同的存储键中
-    if (currentAppType.value === chatAPI.APP_TYPES.TRAVEL) {
-      sessionStorage.setItem('travel_conversation_id', id);
-    } else if (currentAppType.value === chatAPI.APP_TYPES.DESTINY) {
-      sessionStorage.setItem('destiny_conversation_id', id);
-    } else if (currentAppType.value === chatAPI.APP_TYPES.INTELLIGENT) {
-      sessionStorage.setItem('intelligent_conversation_id', id);
-    } else if (currentAppType.value === chatAPI.APP_TYPES.SOLUTION) {
-      sessionStorage.setItem('solution_conversation_id', id);
-    } else if (currentAppType.value === chatAPI.APP_TYPES.ENTERPRISE) {
-      sessionStorage.setItem('enterprise_conversation_id', id);
-    } else {
-      // 默认情况
-      sessionStorage.setItem('chat_conversation_id', id);
-    }
-    
-    // 如果中间层已启用，同步会话数据
-    if (isUsingMiddleLayer.value) {
-      // 注册或更新中间层会话
-      swManager.registerSession(id, {
-        type: getSessionType(),
-        userId: userId.value,
-        messages: sortedMessages.value,
-        created_at: Date.now()
-      });
-      
-      // 设置会话监听器
-      setupSessionListener();
-    }
-    
-    return true;
-  };
-  
-  // 根据应用类型获取会话类型
-  const getSessionType = () => {
-    switch(currentAppType.value) {
-      case chatAPI.APP_TYPES.TRAVEL:
-        return 'travel-assistant';
-      case chatAPI.APP_TYPES.DESTINY:
-        return 'destiny-assistant';
-      case chatAPI.APP_TYPES.INTELLIGENT:
-        return 'intelligent-assistant';
-      case chatAPI.APP_TYPES.SOLUTION:
-        return 'solution-assistant';
-      case chatAPI.APP_TYPES.ENTERPRISE:
-        return 'enterprise-assistant';
-      default:
-        return 'chat-assistant';
-    }
-  };
-  
   // 处理消息流
   const handleMessageStream = async (response) => {
     if (!response || !response.body) {
@@ -934,6 +857,11 @@ export const useChatStore = defineStore('chat', () => {
     
     // 设置当前任务为加载状态
     isGenerating.value = true;
+    
+    // 标记流式状态开始
+    if (window.streamingState) {
+      window.streamingState.setStreaming(true);
+    }
     
     // 初始化流阅读器
     const reader = response.body.getReader();
@@ -1001,10 +929,15 @@ export const useChatStore = defineStore('chat', () => {
               
               // 更新会话ID (如果存在且当前无会话ID)
               if (data.conversation_id && !currentConversationId.value) {
-                handleConversationId(data.conversation_id);
+                currentConversationId.value = data.conversation_id;
                 
                 // 更新消息中的会话ID
                 messages.value[assistantMessageIndex].conversation_id = data.conversation_id;
+              }
+              
+              // 如果有消息ID，更新消息的ID
+              if (data.message_id) {
+                messages.value[assistantMessageIndex].id = data.message_id;
               }
               
               // 更新时间戳，用于防超时保护
@@ -1019,7 +952,7 @@ export const useChatStore = defineStore('chat', () => {
               
               // 更新会话ID (如果存在且当前无会话ID)
               if (data.conversation_id && !currentConversationId.value) {
-                handleConversationId(data.conversation_id);
+                currentConversationId.value = data.conversation_id;
               }
               
               // 重置任务状态
@@ -1056,12 +989,22 @@ export const useChatStore = defineStore('chat', () => {
         });
       }
       
+      // 流式处理完成，重置流式状态
+      if (window.streamingState) {
+        window.streamingState.setStreaming(false);
+      }
+      
       return messageContent;
     } catch (error) {
       console.error('读取流数据失败:', error);
       isStreaming.value = false;
       isGenerating.value = false;
       isLoading.value = false;
+      
+      // 错误时也要结束流式状态标记
+      if (window.streamingState) {
+        window.streamingState.setStreaming(false);
+      }
       
       // 检查消息内容，如果已经有内容则保留
       const currentMessage = messages.value[assistantMessageIndex];
@@ -1085,6 +1028,27 @@ export const useChatStore = defineStore('chat', () => {
       }
       
       throw error;
+    }
+  };
+  
+  // 更新版本 - 接收原始响应内容
+  const handleStreamEnd = (rawResponse = '') => {
+    // 存储原始响应
+    lastRawResponse.value = rawResponse;
+    logDebug('流响应原始内容', { length: rawResponse.length });
+
+    // 结束加载状态
+    isLoading.value = false;
+    isStreaming.value = false;
+    
+    // 确保流式状态被标记为结束
+    if (window.streamingState) {
+      window.streamingState.setStreaming(false);
+    }
+    
+    // 如果我们有了新的会话ID，刷新会话列表
+    if (currentConversationId.value) {
+      fetchConversations();
     }
   };
   

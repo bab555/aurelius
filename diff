@@ -1,0 +1,35 @@
+{
+  "components": {
+    "schemas": {
+      "BaziResponse": {
+        "properties": {
+          "result": {
+            "properties": {
+              "八字排盘结果": {
+                "properties": {
+                  "四柱八字": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "example": ["庚午", "丁未", "甲子", "丙午"]
+                  },
+                  "五行分析": {
+                    "type": "object",
+                    "properties": {
+                      "金": {"type": "number", "example": 4.5},
+                      "木": {"type": "number", "example": 3.2},
+                      "水": {"type": "number", "example": 2.1},
+                      "火": {"type": "number", "example": 7.8},
+                      "土": {"type": "number", "example": 5.0}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+} 

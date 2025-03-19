@@ -1,7 +1,7 @@
 <template>
   <div class="message-formatter">
-    <!-- 当内容包含markdown代码块且内容包含八字排盘内容时，使用格式化处理，不进入代码块模式 -->
-    <template v-if="hasCodeBlock && (content.includes('八字') || content.includes('命盘') || content.includes('五行'))">
+    <!-- 当内容包含markdown代码块且内容包含八字排盘内容，或者同时包含代码块和HTML标签时，使用格式化处理，不进入代码块模式 -->
+    <template v-if="hasCodeBlock && ((content.includes('八字') || content.includes('命盘') || content.includes('五行')) || hasHtmlTags)">
       <div class="content-container" :class="{'allow-copy': allowCopy}" v-html="formatGeneral()"></div>
     </template>
     
@@ -93,6 +93,11 @@ const hasDetailsBlock = computed(() => {
   return hasDetailsOpen && hasDetailsClose && hasSummaryOpen;
 });
 
+// 检测是否包含HTML标签
+const hasHtmlTags = computed(() => {
+  return /<\/?[a-z][\s\S]*>/i.test(props.content);
+});
+
 // 提取第一个代码块
 function extractCodeBlock() {
   try {
@@ -157,6 +162,11 @@ function formatGeneral(text = props.content) {
   console.log('[MessageFormatter] 开始格式化消息，内容长度:', (text || '').length, 
     '内容开头:', text?.substring(0, 30).replace(/\n/g, '\\n') || '',
     '主机名:', window.location.hostname);
+    
+  // 记录HTML和代码块混合内容的调试信息
+  if (hasHtmlTags.value && hasCodeBlock.value) {
+    console.log('[MessageFormatter] 检测到HTML和代码块混合内容，使用通用格式化处理');
+  }
   
   let formatted = text || ''; // 确保text不是null或undefined
   

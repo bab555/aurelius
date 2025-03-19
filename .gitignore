@@ -1,0 +1,25 @@
+# Python缓存文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 临时文件
+*.log
+*.tmp
+
+# 环境配置
+.env
+.venv
+env/
+venv/
+ENV/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 排除node_modules
+node_modules/
+
+# 排除特定文件夹
+bazi_plugin/ 

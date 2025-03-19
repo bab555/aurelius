@@ -34,6 +34,19 @@ hljs.registerLanguage('xml', xml);
 hljs.registerLanguage('css', css);
 hljs.registerLanguage('markdown', markdown);
 hljs.registerLanguage('md', markdown);
+// 注册普通文本语言（将普通文本作为无高亮处理但不报错）
+hljs.registerLanguage('plaintext', function() {
+  return {
+    name: 'plaintext',
+    contains: []
+  };
+});
+hljs.registerLanguage('text', function() {
+  return {
+    name: 'text',
+    contains: []
+  };
+});
 
 const props = defineProps({
   code: {
@@ -57,8 +70,19 @@ const highlightedCode = computed(() => {
         return escapeHtml(props.code);
       }
       
+      // 验证语言是否被注册
+      if (!hljs.getLanguage(props.language)) {
+        console.warn(`未注册的语言: ${props.language}，使用纯文本显示`);
+        return escapeHtml(props.code);
+      }
+      
       // 其他语言正常高亮
-      return hljs.highlight(props.code, { language: props.language }).value;
+      try {
+        return hljs.highlight(props.code, { language: props.language }).value;
+      } catch (languageError) {
+        console.warn(`语言 ${props.language} 高亮失败:`, languageError);
+        return escapeHtml(props.code);
+      }
     }
     
     // 自动检测语言

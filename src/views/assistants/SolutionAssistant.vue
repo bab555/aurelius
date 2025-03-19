@@ -8,8 +8,8 @@
     <div class="p-4 md:p-8 flex flex-col h-full">
       <!-- 页面标题 -->
       <div class="mb-6 flex-shrink-0">
-        <h1 class="text-2xl md:text-3xl font-bold text-white mb-2">方案助手</h1>
-        <p class="text-gray-400 text-sm">专业的方案撰写大师，模型联合作业的典范，格式化输出，一次可用</p>
+        <h1 class="text-2xl md:text-3xl font-bold text-white mb-2">写作助手</h1>
+        <p class="text-gray-400 text-sm">智能写作大师，模板化输出，一键到位。独家设计支持超长文本创作，解决上下文记忆衰退，最长可处理超20万字的作品</p>
         
         <!-- API连接状态提示 -->
         <div class="mt-2 flex items-center">
@@ -33,124 +33,125 @@
         </div>
       </div>
       
-      <!-- 聊天区域 - 使用flex-1确保填充可用空间 -->
-      <div class="flex-1 bg-[#0e0b36] p-4 md:p-6 mb-4 rounded-lg flex flex-col min-h-0">
-        <!-- 聊天记录 - 确保有明确的高度和滚动设置 -->
-        <div class="flex-1 overflow-y-auto custom-scrollbar min-h-0" ref="chatContainer">
-          <!-- 加载状态 -->
-          <div v-if="isLoading && messages.length === 0" class="flex justify-center py-10">
-            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+      <!-- 写作编辑模式 -->
+      <div v-if="!showCopywritingResults" class="flex-1 flex flex-col bg-[#0e0b36] rounded-lg p-6 min-h-0">
+        <div class="flex-1 overflow-y-auto custom-scrollbar">
+          <!-- 写作类型选择区域 -->
+          <div class="mb-6">
+            <label class="block text-white text-sm font-medium mb-2">选择写作类型</label>
+            <select 
+              v-model="selectedType" 
+              class="w-full bg-[#191637] text-white border border-gray-700 rounded-lg py-2 px-4 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              @change="onTypeChange"
+            >
+              <option value="" disabled>请选择写作类型</option>
+              <option v-for="(type, index) in copywritingTypes" :key="index" :value="type.value">
+                {{ type.name }}
+              </option>
+            </select>
           </div>
 
-          <!-- 错误提示 -->
-          <div v-if="chatStore.error" class="flex justify-center py-4">
-            <div class="bg-red-500/20 text-red-200 px-4 py-2 rounded-lg">
-              {{ chatStore.error }}
-            </div>
+          <!-- 细分类型选择区域 -->
+          <div class="mb-6">
+            <label class="block text-white text-sm font-medium mb-2">选择细分类型</label>
+            <select 
+              v-model="selectedSubtype" 
+              class="w-full bg-[#191637] text-white border border-gray-700 rounded-lg py-2 px-4 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              :disabled="!selectedType || subtypeOptions.length === 0"
+            >
+              <option value="" disabled>请选择细分类型</option>
+              <option v-for="(subtype, index) in subtypeOptions" :key="index" :value="subtype.value">
+                {{ subtype.name }}
+              </option>
+            </select>
           </div>
           
-          <div v-if="messages.length === 0 && !isLoading" class="h-full flex flex-col items-center justify-center text-center px-4">
-            <div class="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mb-4">
-              <i class="fas fa-file-alt text-primary text-2xl"></i>
+          <!-- 写作要求输入区域 -->
+          <div class="mb-6 flex-1">
+            <label class="block text-white text-sm font-medium mb-2">请输入写作要求和内容大纲</label>
+            <textarea 
+              v-model="copywritingRequirements" 
+              class="w-full h-64 bg-[#191637] text-white border border-gray-700 rounded-lg py-3 px-4 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+              placeholder="请输入您的写作需求、目标读者、作品风格、内容大纲等具体要求..."
+            ></textarea>
             </div>
-            <h3 class="text-lg font-medium mb-2">欢迎使用方案助手</h3>
-            <p class="text-gray-400 text-sm max-w-md mb-8">
-              我是您的专业方案设计助手，可以帮您制定各类商业计划、活动策划、解决方案文档，直接可用于实际工作场景。
-            </p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 w-full max-w-xl">
+          
+          <!-- 生成按钮 -->
+          <div class="flex justify-center mt-4">
               <button 
-                v-for="(suggestion, index) in suggestions" 
-                :key="index"
-                class="bg-primary/10 border border-primary/30 hover:bg-primary/20 rounded-lg p-3 text-left transition-colors"
-                @click="startConversation(suggestion)"
-              >
-                <p class="text-white text-sm">{{ suggestion }}</p>
+              @click="generateCopywriting" 
+              :disabled="!isFormValid || taskStatus === TASK_STATUS.WAITING || taskStatus === TASK_STATUS.PROCESSING"
+              class="bg-primary hover:bg-primary/80 text-white px-4 py-2 rounded-lg mt-4 w-full md:w-auto transition-colors"
+            >
+              <span v-if="taskStatus === TASK_STATUS.IDLE">生成内容</span>
+              <span v-else-if="taskStatus === TASK_STATUS.WAITING || taskStatus === TASK_STATUS.PROCESSING">
+                <i class="fas fa-spinner fa-spin mr-2"></i>处理中...
+              </span>
+              <span v-else-if="taskStatus === TASK_STATUS.ERROR">
+                <i class="fas fa-exclamation-triangle mr-2"></i>重试
+              </span>
               </button>
             </div>
           </div>
-          
-          <div v-else class="space-y-6 pb-4">
-            <!-- 实际消息 -->
-            <div v-for="msg in messages" :key="msg.id" class="flex items-start" :class="{'justify-end': msg.role === 'user'}">
-              <!-- AI消息 -->
-              <template v-if="msg.role === 'assistant'">
-                <div class="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
-                  <i class="fas fa-robot text-primary" :class="{'text-red-500': msg.isError}"></i>
-                </div>
-                <div class="ml-4 bg-white/5 rounded-lg p-4 max-w-[80%]" :class="{'bg-red-900/10 border border-red-500/20': msg.isError}">
-                  <div v-if="msg.isStreaming" class="flex items-center">
-                    <div class="text-gray-200">
-                      <message-formatter 
-                        :content="msg.content || ''" 
-                        @thinking-processing="pauseScrolling"
-                        @thinking-processed="resumeScrolling"
-                      ></message-formatter>
-                    </div>
-                    <div class="typing-indicator ml-2">
-                      <span></span>
-                      <span></span>
-                      <span></span>
-                    </div>
-                  </div>
-                  <div v-else class="text-gray-200">
-                    <message-formatter 
-                      :content="msg.content || ''"
-                      @thinking-processing="pauseScrolling"
-                      @thinking-processed="resumeScrolling"
-                    ></message-formatter>
                   </div>
                   
-                  <!-- 消息控制按钮 -->
-                  <div v-if="!msg.isError" class="mt-3 flex justify-end space-x-2 text-xs">
-                    <button v-if="msg.isStreaming" @click="chatStore.stopGenerating()" 
-                            class="text-gray-400 hover:text-gray-200">
-                      <i class="fas fa-stop mr-1"></i>停止生成
-                    </button>
+      <!-- 写作结果展示区域 -->
+      <div v-else class="flex-1 bg-[#0e0b36] p-4 md:p-6 mb-4 rounded-lg flex flex-col min-h-0">
+        <!-- 处理状态指示器 -->
+        <div v-if="taskStatus === TASK_STATUS.WAITING || taskStatus === TASK_STATUS.PROCESSING" 
+             class="bg-primary/10 rounded-lg p-4 mb-4 text-white border border-primary/20">
+          <div class="flex items-center">
+            <i class="fas fa-spinner fa-spin mr-2 text-primary"></i>
+            <span>正在处理您的写作请求，已用时 {{ waitingTimeDisplay }}</span>
                   </div>
+          <p class="mt-2 text-sm text-gray-400">
+            超长文本生成可能需要较长时间，请耐心等待。您可以刷新页面或稍后返回，系统会自动继续处理您的请求。
+          </p>
                 </div>
-              </template>
-              
-              <!-- 用户消息 -->
-              <template v-else>
-                <div class="mr-4 bg-white/5 rounded-lg p-4 max-w-[80%]">
-                  <p class="text-gray-200">{{ msg.content }}</p>
+        
+        <!-- 错误状态指示器 -->
+        <div v-if="taskStatus === TASK_STATUS.ERROR" 
+             class="bg-red-900/20 rounded-lg p-4 mb-4 text-white border border-red-500/30">
+          <div class="flex items-center">
+            <i class="fas fa-exclamation-triangle mr-2 text-red-500"></i>
+            <span>处理您的请求时遇到问题</span>
                 </div>
-                <div class="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center flex-shrink-0">
-                  <i class="fas fa-user text-gray-400"></i>
-                </div>
-              </template>
-            </div>
-          </div>
+          <p class="mt-2 text-sm text-gray-400">
+            生成内容过程中出现错误，请点击下方按钮重试，或返回修改您的需求。
+          </p>
+          <div class="mt-3 flex gap-3">
+            <button @click="retryTask" 
+                    class="bg-primary hover:bg-primary/80 text-white px-3 py-1 rounded text-sm">
+              重新生成
+            </button>
+            <button @click="isRequirementsView = true; isResultView = false" 
+                    class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm">
+              修改需求
+            </button>
         </div>
       </div>
 
-      <!-- 底部输入区域 -->
-      <div class="mt-4 flex-shrink-0">
-        <div class="flex items-center space-x-2">
-          <!-- 输入框 -->
-          <div class="relative flex-1">
-            <textarea
-              v-model="userInput"
-              @keydown.enter.prevent="sendMessage"
-              placeholder="输入您的问题..." 
-              class="bg-gray-900 border border-gray-700 rounded-lg text-white p-3 w-full focus:outline-none focus:border-primary resize-none"
-              rows="1"
-              ref="textareaRef"
-              :disabled="isLoading || isInputDisabled"
-            ></textarea>
-          </div>
+        <!-- 生成的写作结果 -->
+        <div v-else class="flex-1 overflow-y-auto custom-scrollbar min-h-0 prose prose-invert max-w-none">
+          <div v-if="generatedContent" v-html="formattedContent"></div>
+          <div v-else class="text-center text-gray-400 my-10">暂无生成的内容</div>
           
-          <!-- 发送按钮 -->
+          <!-- 重新生成按钮 -->
+          <div class="flex justify-center mt-8 mb-4">
           <button 
-            @click="sendMessage" 
-            class="h-[42px] w-10 bg-primary rounded-lg flex items-center justify-center flex-shrink-0"
-            :disabled="isLoading || !userInput.trim()"
-            :class="{'opacity-50 cursor-not-allowed': isLoading || !userInput.trim()}"
-          >
-            <i class="fas fa-paper-plane text-white text-sm"></i>
+              @click="resetForm" 
+              class="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors mr-4"
+            >
+              返回编辑
+            </button>
+            <button 
+              @click="copyToClipboard" 
+              class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              复制全文
           </button>
         </div>
-        <div class="text-xs text-gray-500 mt-2 text-center">方案助手，专业方案一键生成</div>
+        </div>
       </div>
     </div>
   </div>
@@ -163,6 +164,9 @@ import MessageFormatter from '../../components/MessageFormatter.vue'
 import * as swManager from '../../services/swManager'
 import * as chatAPI from '../../services/chatAPI'
 import { useRouter } from 'vue-router'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+import { getCredentials } from '@/services/chatAPI'
 
 // 使用聊天状态存储
 const chatStore = useChatStore()
@@ -174,590 +178,385 @@ const syncedWithMiddleLayer = ref(false)
 // 组件就绪状态
 const isComponentReady = ref(false)
 
-// DOM引用
-const chatContainer = ref(null)
-const textareaRef = ref(null)
-const messagesContainer = ref(null)
-const scrollContainer = ref(null)
-const observer = ref(null)
-const scrollDebounceTimer = ref(null)
+// 写作模式相关状态
+const showCopywritingResults = ref(false)
+const isGenerating = ref(false)
+const generatedContent = ref('')
+const selectedType = ref('')
+const selectedSubtype = ref('')
+const copywritingRequirements = ref('')
 
-// 用户输入
-const userInput = ref('')
-const isLoading = ref(false)
-const isInputDisabled = ref(false) // 控制输入框是否禁用
-
-// 对话建议
-const suggestions = [
-  "帮我写一份企业数字化转型的详细实施方案",
-  "制定一个新产品上市的营销策划方案",
-  "设计一个公司年会活动策划方案，包含预算和流程",
-  "写一份教育机构线上转型的完整解决方案"
-]
-
-// 自动调整文本框高度
-const adjustTextareaHeight = () => {
-  if (!textareaRef.value) return
-  try {
-    textareaRef.value.style.height = 'auto'
-    textareaRef.value.style.height = `${Math.min(textareaRef.value.scrollHeight, 150)}px`
-  } catch (e) {
-    console.error('调整文本框高度失败:', e);
-  }
+// 任务状态管理
+const TASK_STATUS = {
+  IDLE: 'idle',
+  WAITING: 'waiting',
+  PROCESSING: 'processing',
+  COMPLETED: 'completed',
+  ERROR: 'error'
 }
 
-watch(userInput, adjustTextareaHeight)
+// 任务持久化相关状态
+const taskStatus = ref(TASK_STATUS.IDLE)
+const taskId = ref('')
+const taskStartTime = ref(0)
+const pollInterval = ref(5000) // 初始轮询间隔5秒
+const maxPollInterval = 30000 // 最大轮询间隔30秒
+const pollTimeoutId = ref(null)
+const waitingTimeDisplay = ref('00:00')
+const isPollingActive = ref(false)
+
+// 写作类型数据
+const copywritingTypes = ref([
+  {
+    name: '技术文档',
+    value: 'technical',
+    subtypes: [
+      { name: '开发文档', value: 'dev_docs' },
+      { name: '用户手册', value: 'user_manual' },
+      { name: '技术规格说明', value: 'specs' },
+      { name: '教程指南', value: 'tutorial' }
+    ]
+  },
+  {
+    name: '商业文书',
+    value: 'business',
+    subtypes: [
+      { name: '商业计划书', value: 'business_plan' },
+      { name: '项目提案', value: 'proposal' },
+      { name: '分析报告', value: 'analysis_report' },
+      { name: '执行摘要', value: 'executive_summary' }
+    ]
+  },
+  {
+    name: '创意写作',
+    value: 'creative',
+    subtypes: [
+      { name: '短篇小说', value: 'short_story' },
+      { name: '诗歌', value: 'poetry' },
+      { name: '剧本台词', value: 'script' },
+      { name: '叙事散文', value: 'narrative' }
+    ]
+  },
+  {
+    name: '新媒体内容',
+    value: 'media',
+    subtypes: [
+      { name: '平台文案', value: 'article' },
+      { name: '营销文案', value: 'social_media' },
+      { name: '视频脚本', value: 'video_script' },
+      { name: '内容规划', value: 'content_plan' }
+    ]
+  },
+  {
+    name: '来往公文',
+    value: 'official',
+    subtypes: [
+      { name: '公函', value: 'official_letter' },
+      { name: '通知公告', value: 'announcement' },
+      { name: '备忘录', value: 'memo' },
+      { name: '回复函', value: 'reply_letter' }
+    ]
+  }
+])
+
+// 联动下拉列表的选项
+const subtypeOptions = computed(() => {
+  if (!selectedType.value) return []
+  const selectedTypeObj = copywritingTypes.value.find(type => type.value === selectedType.value)
+  return selectedTypeObj ? selectedTypeObj.subtypes : []
+})
+
+// 表单验证
+const isFormValid = computed(() => {
+  return selectedType.value && 
+         selectedSubtype.value && 
+         copywritingRequirements.value.trim().length > 0
+})
+
+// 格式化后的内容
+const formattedContent = computed(() => {
+  if (!generatedContent.value) return ''
+  
+  // 简单处理纯文本，保留换行，类似Word显示
+  const textWithBreaks = generatedContent.value
+    // 将换行符转换为HTML换行标签
+    .replace(/\n/g, '<br>')
+    // 确保空格被正确显示
+    .replace(/ {2}/g, '&nbsp;&nbsp;')
+    // 处理制表符
+    .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
+  
+  // 使用DOMPurify清理内容，只保留基本格式
+  return DOMPurify.sanitize(textWithBreaks, {
+    ALLOWED_TAGS: ['br'], 
+    ALLOWED_ATTR: []
+  });
+})
 
 // 计算属性
 const messages = computed(() => chatStore.sortedMessages)
 
-// 简化滚动逻辑，专注于用户体验
-const autoScrollEnabled = ref(true); // 默认启用自动滚动
-const isUserScrolling = ref(false);
-const lastScrollTime = ref(0);
-
-// 简化的滚动到底部函数，使用直接方法
-const scrollToBottom = (force = false) => {
-  // 如果用户已禁用自动滚动且不是强制滚动，则不执行
-  if (!autoScrollEnabled.value && !force) {
-    return;
-  }
-  
-  // 如果没有聊天容器则退出
-  if (!chatContainer.value) return;
-  
-  // 记录上次滚动时间
-  lastScrollTime.value = Date.now();
-  
-  // 直接执行滚动
-  console.log('[滚动控制] 执行滚动到底部');
-  try {
-    // 使用原生方法保证可靠性
-    if (force) {
-      // 立即滚动（无动画）
-      chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
-    } else {
-      // 平滑滚动
-      chatContainer.value.scrollTo({
-        top: chatContainer.value.scrollHeight,
-        behavior: 'smooth'
-      });
-    }
-  } catch (e) {
-    console.error('滚动失败:', e);
-    // 回退方法
-    chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
-  }
-};
-
-// 设置基本滚动监听
-const setupScrollSystem = () => {
-  if (!chatContainer.value) return;
-  
-  // 监听滚动事件
-  chatContainer.value.addEventListener('scroll', () => {
-    if (!chatContainer.value) return;
-    
-    // 计算是否用户正在向上滚动查看历史消息
-    const currentPos = chatContainer.value.scrollTop;
-    const maxScroll = chatContainer.value.scrollHeight - chatContainer.value.clientHeight;
-    const distanceFromBottom = maxScroll - currentPos;
-    
-    // 如果距离底部超过200px，认为用户在查看历史
-    if (distanceFromBottom > 200) {
-      // 用户明显向上滚动，临时禁用自动滚动
-      autoScrollEnabled.value = false;
-      isUserScrolling.value = true;
-      console.log('[滚动控制] 用户正在查看历史消息，自动滚动已禁用');
-    } else {
-      // 用户滚回底部，重新启用自动滚动
-      autoScrollEnabled.value = true;
-      isUserScrolling.value = false;
-      console.log('[滚动控制] 用户已接近底部，自动滚动已启用');
-    }
-  });
-  
-  // 定期检查内容变化并滚动
-  const checkContentAndScroll = () => {
-    // 聊天内容变化时自动滚动
-    if (autoScrollEnabled.value && chatContainer.value) {
-      // 检查是否有新消息
-      const lastMessage = messages.value[messages.value.length - 1];
-      const isNewUserMessage = lastMessage && lastMessage.role === 'user';
-      const isStreaming = lastMessage && lastMessage.isStreaming;
-      
-      // 如果是用户新消息或正在流式显示，滚动到底部
-      if (isNewUserMessage || isStreaming) {
-        scrollToBottom();
-      }
-    }
-  };
-  
-  // 创建MutationObserver监听消息区域DOM变化
-  observer.value = new MutationObserver(() => {
-    // 防抖处理
-    clearTimeout(scrollDebounceTimer.value);
-    scrollDebounceTimer.value = setTimeout(() => {
-      checkContentAndScroll();
-    }, 100);
-  });
-  
-  // 开始观察变化
-  observer.value.observe(chatContainer.value, {
-    childList: true,
-    subtree: true,
-    characterData: true
-  });
-};
-
-// 在思考框处理时暂停滚动
-const pauseScrolling = () => {
-  console.log('[滚动控制] 暂停滚动');
-  autoScrollEnabled.value = false;
-};
-
-// 思考框处理完成后恢复滚动
-const resumeScrolling = () => {
-  console.log('[滚动控制] 恢复滚动');
-  autoScrollEnabled.value = true;
-  
-  // 在恢复滚动时执行一次滚动
-  setTimeout(() => {
-    scrollToBottom();
-  }, 50);
-};
-
-// 监听消息数量变化，处理新消息
-watch(() => messages.value.length, (newCount, oldCount) => {
-  if (newCount > oldCount) {
-    // 新消息出现，强制滚动到底部
-    console.log('[滚动控制] 检测到新消息，滚动到底部');
-    setTimeout(() => {
-      scrollToBottom(true);
-    }, 50);
-  }
-});
-
-// 发送消息
-const sendMessage = async () => {
-  // 获取输入框内容并清空
-  const content = userInput.value.trim()
-  if (!content || isLoading.value) return
-  
-  // 清空输入框
-  userInput.value = ''
-  adjustTextareaHeight()
-  
-  try {
-    // 检查并修复可能错误的状态
-    if (chatStore.isLoading || chatStore.isStreaming || chatStore.isGenerating) {
-      console.warn('检测到不一致的状态，尝试自动修复');
-      
-      // 修正所有流式消息的状态
-      chatStore.messages.forEach(msg => {
-        if (msg.isStreaming) {
-          msg.isStreaming = false;
-          msg.content += '\n\n[系统自动修复：此消息在开始新对话前已标记为已完成]';
-        }
-      });
-      
-      // 强制重置所有状态变量
-      chatStore.isLoading = false;
-      chatStore.isStreaming = false;
-      chatStore.isGenerating = false;
-      chatStore.currentTask = null;
-    }
-    
-    // 重新启用自动滚动
-    autoScrollEnabled.value = true
-    
-    // 先滚动到底部
-    scrollToBottom(true)
-    
-    // 如果使用中间层且当前会话已存在，需要确保同步状态
-    if (chatStore.isUsingMiddleLayer && chatStore.currentConversationId) {
-      // 首次发送消息时与中间层同步
-      if (!syncedWithMiddleLayer.value) {
-        try {
-          console.log('首次同步会话到中间层:', chatStore.currentConversationId)
-          await syncWithMiddleLayer()
-        } catch (e) {
-          console.warn('同步到中间层失败:', e)
-          // 继续发送消息，即使同步失败
-        }
-      } else if (syncedWithMiddleLayer.value) {
-        // 如果会话已标记为完成，尝试继续会话
-        console.log('检查是否需要继续已完成的会话')
-        try {
-          await swManager.continueSession(chatStore.currentConversationId)
-        } catch (e) {
-          console.warn('继续会话失败，将尝试发送消息:', e)
-          // 继续执行，即使继续会话失败
-        }
-      }
-    }
-    
-    // 发送消息到API
-    await chatStore.sendMessage(content)
-    
-    // 消息发送成功，保存会话ID并同步
-    if (chatStore.currentConversationId) {
-      sessionStorage.setItem('solution_conversation_id', chatStore.currentConversationId)
-      
-      // 如果是使用中间层且首次同步
-      if (chatStore.isUsingMiddleLayer && !syncedWithMiddleLayer.value) {
-        console.log('消息发送成功，首次同步会话到中间层', chatStore.currentConversationId)
-        await syncWithMiddleLayer()
-      }
-    }
-    
-    // 消息发送后再次滚动到底部
-    setTimeout(() => {
-      scrollToBottom(true)
-    }, 100)
-  } catch (e) {
-    console.error('发送消息失败:', e)
-    
-    // 如果是会话不存在错误，则清理会话ID
-    if (e.message && e.message.includes('Conversation Not Exists')) {
-      console.warn('会话不存在，清理会话ID')
-      await cleanupSession()
-    }
-    
-    // 显示错误消息给用户
-    messages.value.push({
-      id: crypto.randomUUID(),
-      conversation_id: chatStore.currentConversationId || '',
-      role: 'assistant',
-      content: `⚠️ 消息发送失败：${e.message || '网络连接错误'}`,
-      created_at: Date.now() / 1000,
-      isError: true
-    });
-    
-    // 尝试自动恢复输入内容
-    if (content && !userInput.value) {
-      userInput.value = content;
-      adjustTextareaHeight();
-    }
-  }
+// 写作相关方法
+const onTypeChange = () => {
+  // 重置子类型选择
+  selectedSubtype.value = ''
 }
 
-// 开始以建议开始对话
-const startConversation = (suggestion) => {
-  userInput.value = suggestion
-  sendMessage()
-}
-
-// 格式化消息内容（处理换行、链接等）
-const formatMessage = (content) => {
-  if (!content) return ''
+// 生成写作内容
+const generateCopywriting = async () => {
+  if (!selectedType.value || !selectedSubtype.value || !copywritingRequirements.value.trim()) {
+    return
+  }
+  
+  // 设置状态为等待
+  taskStatus.value = TASK_STATUS.WAITING
+  
+  // 生成唯一任务ID
+  taskId.value = `writing_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`
+  taskStartTime.value = Date.now()
+  
+  // 持久化任务状态到localStorage
+  saveTaskState()
+  
+  // 开始计时显示
+  startWaitingTimer()
   
   try {
-    // 保留原始换行符，不做替换
-    // let formatted = content.replace(/\n/g, '<br>')
-    let formatted = content
+    // 构建提示词
+    const selectedTypeText = copywritingTypes.value.find(t => t.value === selectedType.value)?.name || ''
+    const selectedSubtypeText = subtypeOptions.value.find(st => st.value === selectedSubtype.value)?.name || ''
     
-    // 将URL转换为可点击的链接
-    formatted = formatted.replace(
-      /(https?:\/\/[^\s]+)/g, 
-      '<a href="$1" target="_blank" class="text-primary hover:underline">$1</a>'
-    )
+    const prompt = `我需要一篇${selectedTypeText}中的${selectedSubtypeText}。以下是具体要求：\n\n${copywritingRequirements.value}`
     
-    // 先处理完整的details标签，但跳过已处理的思考框
-    if (formatted.includes('<details>') && formatted.includes('</details>') && !formatted.includes('class="thinking-box"')) {
-      try {
-        // 跳过思考框内容，仅处理其他details
-        const detailsPattern = /<details>([\s\S]*?)<summary>(?!Thinking)([\s\S]*?)<\/summary>([\s\S]*?)<\/details>/g;
-        formatted = formatted.replace(detailsPattern, 
-          '<details class="my-3 bg-[#070620] rounded-lg overflow-hidden border border-primary/10"><summary class="p-3 cursor-pointer text-gray-300 font-medium hover:bg-[#0a0830] transition-colors">$2</summary><div class="p-3 border-t border-primary/10 bg-[#080722] text-gray-300">$3</div></details>');
-      } catch (e) {
-        console.error('重新处理details标签失败', e);
-      }
-    }
+    // 清除聊天历史
+    chatStore.clearMessages()
     
-    // 处理不完整的details和summary标签
-    if (formatted.includes('<details>') && !formatted.includes('</details>') && !formatted.includes('class="thinking-box"')) {
-      formatted = formatted.replace(/<details>(?![\s\S]*?Thinking)([\s\S]*)$/, 
-        '<div class="bg-[#070620] rounded-lg p-3 border border-primary/10 text-gray-300">$1</div>');
-    }
+    // 发送消息并切换到结果查看
+    showCopywritingResults.value = false
+    isGenerating.value = true
     
-    if (formatted.includes('<summary>') && !formatted.includes('</summary>')) {
-      formatted = formatted.replace(/<summary>([\s\S]*)$/, 
-        '<div class="font-medium">$1</div>');
-    }
+    // 设置处理中状态
+    taskStatus.value = TASK_STATUS.PROCESSING
+    saveTaskState()
     
-    // 处理代码块
-    formatted = formatted.replace(
-      /```([a-z]*)\n([\s\S]+?)\n```/g,
-      '<pre class="bg-[#111030] border border-primary/20 p-4 rounded-lg my-3 overflow-x-auto"><code class="text-gray-300 font-mono text-sm">$2</code></pre>'
-    )
+    // 发送实际消息
+    await chatStore.sendMessage(prompt)
     
-    // 处理行内代码
-    formatted = formatted.replace(
-      /`([^`]+)`/g,
-      '<code class="bg-[#111030] border border-primary/10 px-1.5 py-0.5 rounded text-gray-300 font-mono text-sm">$1</code>'
-    )
+    // 设置为完成状态
+    taskStatus.value = TASK_STATUS.COMPLETED
+    saveTaskState()
     
-    // 最后将换行符替换为<br>
-    // formatted = formatted.replace(/\n/g, '<br>')
+    // 停止轮询和计时器
+    stopPolling()
     
-    // 将URL转换为可点击的链接
-    formatted = formatted.replace(
-      /(https?:\/\/[^\s]+)/g, 
-      '<a href="$1" target="_blank" class="text-primary hover:underline">$1</a>'
-    )
-    
-    return formatted
+    // 清除任务状态
+    clearTaskState()
   } catch (error) {
-    console.error('格式化消息失败:', error)
-    return content || ''
+    console.error('生成写作内容失败:', error)
+    taskStatus.value = TASK_STATUS.ERROR
+    saveTaskState()
   }
 }
+
+// 开始等待计时器
+const startWaitingTimer = () => {
+  // 初始化显示
+  updateWaitingTimeDisplay()
+  
+  // 每秒更新一次显示
+  const timerId = setInterval(() => {
+    updateWaitingTimeDisplay()
+  }, 1000)
+  
+  // 保存计时器ID以便清除
+  window._waitingTimerId = timerId
+}
+
+// 更新等待时间显示
+const updateWaitingTimeDisplay = () => {
+  const elapsedSeconds = Math.floor((Date.now() - taskStartTime.value) / 1000)
+  const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0')
+  const seconds = (elapsedSeconds % 60).toString().padStart(2, '0')
+  waitingTimeDisplay.value = `${minutes}:${seconds}`
+}
+
+// 停止等待计时器
+const stopWaitingTimer = () => {
+  if (window._waitingTimerId) {
+    clearInterval(window._waitingTimerId)
+    window._waitingTimerId = null
+  }
+}
+
+// 保存任务状态到localStorage
+const saveTaskState = () => {
+  try {
+    const state = {
+      taskId: taskId.value,
+      status: taskStatus.value,
+      startTime: taskStartTime.value,
+      selectedType: selectedType.value,
+      selectedSubtype: selectedSubtype.value,
+      requirements: copywritingRequirements.value,
+      timestamp: Date.now()
+    }
+    localStorage.setItem('writing_assistant_task', JSON.stringify(state))
+  } catch (error) {
+    console.error('保存任务状态失败:', error)
+  }
+}
+
+// 从localStorage加载任务状态
+const loadTaskState = () => {
+  try {
+    const stateJson = localStorage.getItem('writing_assistant_task')
+    if (!stateJson) return false
+    
+    const state = JSON.parse(stateJson)
+    
+    // 检查任务是否已经过期(3小时过期限制)
+    const MAX_TASK_AGE = 3 * 60 * 60 * 1000 // 3小时
+    if (Date.now() - state.timestamp > MAX_TASK_AGE) {
+      clearTaskState()
+      return false
+    }
+    
+    // 恢复任务状态
+    taskId.value = state.taskId
+    taskStatus.value = state.status
+    taskStartTime.value = state.startTime
+    selectedType.value = state.selectedType
+    selectedSubtype.value = state.selectedSubtype
+    copywritingRequirements.value = state.requirements
+    
+    // 如果任务未完成，则开始轮询
+    if (taskStatus.value === TASK_STATUS.WAITING || taskStatus.value === TASK_STATUS.PROCESSING) {
+      showCopywritingResults.value = false
+      isGenerating.value = true
+      startPolling()
+      startWaitingTimer()
+      return true
+    }
+    
+    return false
+      } catch (error) {
+    console.error('加载任务状态失败:', error)
+    return false
+  }
+}
+
+// 清除任务状态
+const clearTaskState = () => {
+  localStorage.removeItem('writing_assistant_task')
+  taskId.value = ''
+  taskStatus.value = TASK_STATUS.IDLE
+  stopWaitingTimer()
+  stopPolling()
+}
+
+// 开始轮询检查任务状态
+const startPolling = () => {
+  if (isPollingActive.value) return
+  
+  isPollingActive.value = true
+  pollInterval.value = 5000 // 重置为初始间隔
+  
+  const poll = async () => {
+    try {
+      // 从聊天存储中检查是否有新消息
+      const hasMessages = chatStore.messages.length > 0
+      const lastMessageIsFromBot = hasMessages && chatStore.messages[chatStore.messages.length - 1].role === 'bot'
+      
+      if (hasMessages) {
+        // 如果检测到消息，则更新状态
+        if (lastMessageIsFromBot) {
+          console.log('检测到AI回复，任务已完成')
+          taskStatus.value = TASK_STATUS.COMPLETED
+          saveTaskState()
+          stopPolling()
+          stopWaitingTimer()
+          clearTaskState()
+          return
+        }
+      }
+      
+      // 增加轮询间隔时间，最大不超过maxPollInterval
+      pollInterval.value = Math.min(pollInterval.value * 1.5, maxPollInterval)
+      
+      // 如果仍未完成，继续轮询
+      if (taskStatus.value !== TASK_STATUS.COMPLETED && taskStatus.value !== TASK_STATUS.ERROR) {
+        pollTimeoutId.value = setTimeout(poll, pollInterval.value)
+      }
+    } catch (error) {
+      console.error('轮询过程出错:', error)
+      taskStatus.value = TASK_STATUS.ERROR
+      saveTaskState()
+    }
+  }
+  
+  // 开始第一次轮询
+  pollTimeoutId.value = setTimeout(poll, pollInterval.value)
+}
+
+// 停止轮询
+const stopPolling = () => {
+  if (pollTimeoutId.value) {
+    clearTimeout(pollTimeoutId.value)
+    pollTimeoutId.value = null
+  }
+  isPollingActive.value = false
+}
+
+// 任务出错时的重试操作
+const retryTask = () => {
+  if (taskStatus.value === TASK_STATUS.ERROR) {
+    taskStatus.value = TASK_STATUS.IDLE
+    saveTaskState()
+    generateCopywriting()
+  }
+}
+
+// 页面挂载时检查是否有未完成的任务
+onMounted(() => {
+  const hasRestoredTask = loadTaskState()
+  
+  // 如果恢复了任务状态，则开始相关处理
+  if (hasRestoredTask) {
+    console.log('已恢复未完成的写作任务，继续处理中...')
+  }
+})
+
+// 页面卸载前确保轮询和计时器被清理
+onBeforeUnmount(() => {
+  stopPolling()
+  stopWaitingTimer()
+})
 
 // 测试API连接
 const testConnection = async () => {
   await chatStore.checkConnection()
 }
 
-// 生命周期钩子注册 - 提前注册所有钩子
-onBeforeUnmount(() => {
-  try {
-    // 如果有活跃会话且使用中间层，标记会话完成
-    if (chatStore.isUsingMiddleLayer && chatStore.currentConversationId && syncedWithMiddleLayer.value) {
-      try {
-        console.log('方案助手页面卸载，标记会话完成并清理资源', chatStore.currentConversationId);
-        swManager.completeSession(chatStore.currentConversationId);
-        swManager.clearSession(chatStore.currentConversationId);
-      } catch (error) {
-        console.error('标记会话完成失败:', error);
-      }
-    }
-    
-    // 移除事件监听器
-    window.removeEventListener('focus', handleWindowFocus);
-    window.removeEventListener('blur', handleWindowBlur);
-    document.removeEventListener('visibilitychange', handleVisibilityChange);
-    
-    // 保存会话ID到sessionStorage
-    if (chatStore.currentConversationId) {
-      sessionStorage.setItem('solution_conversation_id', chatStore.currentConversationId);
-    }
-  } catch (error) {
-    console.error('组件卸载清理失败:', error);
-  }
-});
+const resetForm = () => {
+  showCopywritingResults.value = false
+  generatedContent.value = ''
+}
 
-// 页面加载时初始化
-onMounted(async () => {
-  try {
-    // 初始化聊天状态，使用方案助手APP_TYPE
-    await chatStore.initialize(chatAPI.APP_TYPES.SOLUTION);
-    
-    // 检查API连接状态
-    await chatStore.checkConnection();
-    
-    // 恢复会话流程
-    let sessionLoaded = false;
-    
-    // 尝试从sessionStorage中恢复会话ID
-    const sessionId = sessionStorage.getItem('solution_conversation_id');
-    
-    if (sessionId) {
-      // 验证会话ID格式
-      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (uuidPattern.test(sessionId)) {
-        console.log('从sessionStorage恢复会话:', sessionId);
-        
-        try {
-          // 尝试切换到该会话，这会重置所有状态变量
-          await chatStore.switchConversation(sessionId);
-          
-          // 标记会话已加载
-          sessionLoaded = true;
-          
-          // 直接从后端获取历史消息，确保消息始终能显示
-          console.log('直接从后端获取历史消息');
-          await chatStore.fetchMessages(sessionId);
-          console.log('获取消息完成，消息数量:', chatStore.messages.length);
-          
-          // 记录所有消息的基本信息，帮助调试
-          console.log('[详细日志] 消息内容概览:', chatStore.messages.map(msg => ({
-            id: msg.id.substring(0, 8), // 只显示ID前8位
-            role: msg.role,
-            length: msg.content?.length || 0,
-            preview: msg.content?.substring(0, 30).replace(/\n/g, '\\n') || '',
-            isStreaming: msg.isStreaming
-          })));
-          
-          // 添加详细的消息格式检查
-          if (chatStore.messages.length > 0) {
-            console.log('[详细检查] 第一条消息完整信息:', {
-              id: chatStore.messages[0].id,
-              role: chatStore.messages[0].role,
-              content: chatStore.messages[0].content?.substring(0, 50),
-              isUser: chatStore.messages[0].role === 'user',
-              isAssistant: chatStore.messages[0].role === 'assistant'
-            });
-            
-            // 检查是否有assistant角色的消息
-            const hasAssistantMsg = chatStore.messages.some(msg => msg.role === 'assistant');
-            console.log('[详细检查] 是否包含AI消息:', hasAssistantMsg);
-            
-            // 检查渲染条件
-            const msgElement = document.querySelector('.flex.items-start');
-            if (msgElement) {
-              console.log('[详细检查] 第一条消息DOM:', msgElement.innerHTML.substring(0, 200));
-            }
-          }
-          
-          // 输出计算属性messages的当前状态
-          console.log('[详细日志] 计算属性messages当前长度:', messages.value.length);
-          
-          // 输出DOM状态
-          setTimeout(() => {
-            const messageElements = document.querySelectorAll('.flex.items-start');
-            console.log('[详细日志] 实际渲染的消息元素数量:', messageElements.length);
-            
-            // 检查消息容器是否存在
-            const container = document.querySelector('.space-y-6.pb-4');
-            console.log('[详细日志] 消息容器存在:', !!container, container);
-            
-            // 检查消息格式化组件
-            const formatters = document.querySelectorAll('message-formatter');
-            console.log('[详细日志] 消息格式化组件数量(message-formatter):', formatters.length);
-          }, 500);
-          
-          // 确保视图更新
-          if (chatStore.messages.length === 0) {
-            console.log('未检测到历史消息，添加临时测试消息');
-            // 如果没有消息，添加一条测试消息以便调试
-            chatStore.messages.push({
-              id: crypto.randomUUID(),
-              conversation_id: sessionId,
-              role: 'assistant',
-              content: '⚠️ 系统提示：检测到会话恢复异常，这是一条测试消息。请忽略此消息并尝试继续对话或刷新页面。',
-              created_at: Date.now() / 1000
-            });
-          } else {
-            console.log('检测到历史消息，强制刷新视图');
-            // 使用临时变量克隆消息数组，确保引用变化触发视图更新
-            const tempMessages = [...chatStore.messages];
-            chatStore.messages = [];
-            setTimeout(() => {
-              chatStore.messages = tempMessages;
-            }, 10);
-          }
-          
-          // 尝试从中间层恢复会话中的消息
-          if (chatStore.isUsingMiddleLayer) {
-            try {
-              const restored = await chatStore.tryRestoreSessionFromMiddleLayer();
-              if (restored) {
-                console.log('成功从中间层恢复会话消息');
-                syncedWithMiddleLayer.value = true;
-                
-                // 检查所有消息，确保没有处于流式状态的
-                chatStore.messages.forEach(msg => {
-                  if (msg.isStreaming) {
-                    msg.isStreaming = false;
-                    msg.content += '\n\n[此消息在页面加载时已自动标记为已完成]';
-                    console.log('检测到流式消息，已标记为完成');
-                  }
-                });
-              } else {
-                // 同步到中间层
-                await syncWithMiddleLayer();
-              }
-            } catch (e) {
-              console.warn('从中间层恢复会话失败:', e);
-            }
-          }
-          
-          // 强制重置所有状态变量，确保不会处于"对话中"状态
-          chatStore.isLoading = false;
-          chatStore.isStreaming = false;
-          chatStore.isGenerating = false;
-          chatStore.currentTask = null;
-          
-          console.log('会话恢复完成，状态已重置');
-        } catch (error) {
-          console.warn('恢复会话失败:', error);
-          
-          // 如果是会话不存在错误，则清理会话ID
-          if (error.message && error.message.includes('Conversation Not Exists')) {
-            await cleanupSession();
-            sessionLoaded = false;
-          }
-        }
-      } else {
-        console.warn('会话ID格式不正确:', sessionId);
-        sessionStorage.removeItem('solution_conversation_id');
-      }
-    }
-    
-    // 如果没有恢复到有效会话，则准备新会话环境
-    if (!sessionLoaded) {
-      console.log('准备新对话环境');
-      
-      // 设置应用类型为方案助手
-      chatStore.setAppType(chatAPI.APP_TYPES.SOLUTION);
-      
-      // 清除当前会话ID
-      chatStore.currentConversationId = '';
-      
-      // 重置同步状态
-      syncedWithMiddleLayer.value = false;
-      
-      // 确保所有状态变量重置
-      chatStore.isLoading = false;
-      chatStore.isStreaming = false;
-      chatStore.isGenerating = false;
-      chatStore.currentTask = null;
-    }
-    
-    // 添加页面可见性变更监听
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // 设置滚动系统
-    nextTick(() => {
-      setupScrollSystem();
-      
-      // 初始滚动到底部
-      if (chatStore.messages.length > 0) {
-        scrollToBottom(true);
-      }
-    });
-    
-    // 标记组件为已就绪
-    isComponentReady.value = true;
-  } catch (error) {
-    console.error('初始化组件失败:', error);
-    isComponentReady.value = true; // 即使失败也设置为就绪，允许用户操作
-  }
-});
-
-// 处理会话被其他标签页替换的情况
-const handleSessionReplaced = (event) => {
-  const { oldSessionId, newSessionId } = event.detail;
+const copyToClipboard = () => {
+  // 移除HTML标签后复制
+  const tempElement = document.createElement('div')
+  tempElement.innerHTML = formattedContent.value
+  const textContent = tempElement.textContent || tempElement.innerText || ''
   
-  // 检查是否是当前会话被替换
-  if (chatStore.currentConversationId === oldSessionId) {
-    console.warn('检测到当前会话已在其他标签页中打开，本页面将不再响应');
-    
-    // 显示提示给用户
-    messages.value.push({
-      id: crypto.randomUUID(),
-      conversation_id: chatStore.currentConversationId,
-      role: 'assistant',
-      content: '⚠️ 检测到您已在其他标签页中打开了方案助手。为避免冲突，本页面将不再响应。',
-      created_at: Date.now() / 1000,
-      isError: true
-    });
-    
-    // 禁用输入
-    isInputDisabled.value = true;
-  }
-};
+  navigator.clipboard.writeText(textContent)
+    .then(() => {
+      alert('内容已复制到剪贴板')
+    })
+    .catch(err => {
+      console.error('复制失败:', err)
+      alert('复制失败，请手动选择并复制')
+    })
+}
 
 // 同步到中间层的辅助函数
 const syncWithMiddleLayer = async () => {
@@ -769,8 +568,8 @@ const syncWithMiddleLayer = async () => {
     // 注册会话到中间层
     await swManager.registerSession(chatStore.currentConversationId, {
       type: 'solution-assistant',
-      name: '方案助手',
-      description: '专业方案撰写系统',
+      name: '写作助手',
+      description: '智能写作系统',
       created_at: Date.now()
     });
     
@@ -830,7 +629,7 @@ const handleSessionUpdate = (event) => {
 const handleVisibilityChange = async () => {
   if (document.visibilityState === 'visible') {
     // 页面变为可见时
-    console.log('方案助手页面恢复可见');
+    console.log('写作助手页面恢复可见');
     
     // 如果有当前会话ID，检查会话是否仍然有效
     if (chatStore.currentConversationId) {
@@ -885,7 +684,7 @@ const handleVisibilityChange = async () => {
   } else if (document.visibilityState === 'hidden') {
     // 页面隐藏时，确保会话ID被保存
     if (chatStore.currentConversationId) {
-      console.log('方案助手页面隐藏，保存会话状态');
+      console.log('写作助手页面隐藏，保存会话状态');
       sessionStorage.setItem('solution_conversation_id', chatStore.currentConversationId);
       
       // 如果使用中间层，确保最新状态已同步
@@ -902,25 +701,161 @@ const handleVisibilityChange = async () => {
     }
   }
 };
+
+// 生命周期钩子注册
+onBeforeUnmount(() => {
+  try {
+    // 如果有活跃会话且使用中间层，标记会话完成
+    if (chatStore.isUsingMiddleLayer && chatStore.currentConversationId && syncedWithMiddleLayer.value) {
+      try {
+        console.log('写作助手页面卸载，标记会话完成', chatStore.currentConversationId);
+        swManager.completeSession(chatStore.currentConversationId);
+      } catch (error) {
+        console.error('标记会话完成失败:', error);
+      }
+    }
+    
+    // 移除事件监听器
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    
+    // 保存会话ID到sessionStorage
+    if (chatStore.currentConversationId) {
+      sessionStorage.setItem('solution_conversation_id', chatStore.currentConversationId);
+    }
+  } catch (error) {
+    console.error('组件卸载清理失败:', error);
+  }
+});
+
+// 页面加载时初始化
+onMounted(async () => {
+  try {
+    // 初始化聊天状态，使用方案助手APP_TYPE
+    await chatStore.initialize(chatAPI.APP_TYPES.SOLUTION);
+    
+    // 检查API连接状态
+    await chatStore.checkConnection();
+    
+    // 恢复会话流程
+    let sessionLoaded = false;
+    
+    // 尝试从sessionStorage中恢复会话ID
+    const sessionId = sessionStorage.getItem('solution_conversation_id');
+    
+    if (sessionId) {
+      // 验证会话ID格式
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidPattern.test(sessionId)) {
+        console.log('从sessionStorage恢复会话:', sessionId);
+        
+        try {
+          // 尝试切换到该会话，这会重置所有状态变量
+          await chatStore.switchConversation(sessionId);
+          
+          // 标记会话已加载
+          sessionLoaded = true;
+          
+          // 直接从后端获取历史消息
+          console.log('直接从后端获取历史消息');
+          await chatStore.fetchMessages(sessionId);
+          console.log('获取消息完成，消息数量:', chatStore.messages.length);
+          
+          // 确保所有状态变量重置
+          chatStore.isLoading = false;
+          chatStore.isStreaming = false;
+          chatStore.isGenerating = false;
+          chatStore.currentTask = null;
+          
+          // 尝试从中间层恢复会话中的消息
+          if (chatStore.isUsingMiddleLayer) {
+            try {
+              const restored = await chatStore.tryRestoreSessionFromMiddleLayer();
+              if (restored) {
+                console.log('成功从中间层恢复会话消息');
+                syncedWithMiddleLayer.value = true;
+                
+                // 检查所有消息，确保没有处于流式状态的
+                chatStore.messages.forEach(msg => {
+                  if (msg.isStreaming) {
+                    msg.isStreaming = false;
+                    msg.content += '\n\n[此消息在页面加载时已自动标记为已完成]';
+                    console.log('检测到流式消息，已标记为完成');
+                  }
+                });
+              } else {
+                // 同步到中间层
+                await syncWithMiddleLayer();
+              }
+            } catch (e) {
+              console.warn('从中间层恢复会话失败:', e);
+            }
+          }
+        } catch (error) {
+          console.warn('恢复会话失败:', error);
+          
+          // 如果是会话不存在错误，则清理会话ID
+          if (error.message && error.message.includes('Conversation Not Exists')) {
+            await cleanupSession();
+            sessionLoaded = false;
+          }
+        }
+      } else {
+        console.warn('会话ID格式不正确:', sessionId);
+        sessionStorage.removeItem('solution_conversation_id');
+      }
+    }
+    
+    // 如果没有恢复到有效会话，则准备新会话环境
+    if (!sessionLoaded) {
+      console.log('准备新对话环境');
+      
+      // 设置应用类型为方案助手
+      chatStore.setAppType(chatAPI.APP_TYPES.SOLUTION);
+      
+      // 清除当前会话ID
+      chatStore.currentConversationId = '';
+      
+      // 重置同步状态
+      syncedWithMiddleLayer.value = false;
+      
+      // 确保所有状态变量重置
+      chatStore.isLoading = false;
+      chatStore.isStreaming = false;
+      chatStore.isGenerating = false;
+      chatStore.currentTask = null;
+    }
+    
+    // 添加页面可见性变更监听
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // 标记组件为已就绪
+    isComponentReady.value = true;
+  } catch (error) {
+    console.error('初始化组件失败:', error);
+    isComponentReady.value = true; // 即使失败也设置为就绪，允许用户操作
+  }
+});
 </script>
 
 <style scoped>
-/* 聊天相关样式 */
-.message-container:last-child {
-  margin-bottom: 10px;
+/* 输入框自适应高度 */
+textarea {
+  max-height: 200px;
+  min-height: 42px;
 }
 
-/* 确保文本正确换行的关键样式 */
-.text-gray-200 {
-  white-space: pre-wrap !important;
+/* 用于思考框的样式 */
+:deep(.thinking-box) {
+  background-color: rgba(25, 22, 55, 0.6);
+  border: 1px solid rgba(138, 109, 241, 0.3);
+  border-radius: 0.5rem;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  position: relative;
+  overflow: hidden;
 }
 
-/* 自定义滚动条样式 */
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) rgba(0, 0, 0, 0.1);
-}
-
+/* 自定义滚动条 */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
@@ -931,28 +866,30 @@ const handleVisibilityChange = async () => {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(138, 109, 241, 0.5);
   border-radius: 10px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(138, 109, 241, 0.8);
 }
 
-/* 打字指示器动画 */
+/* 消息输入状态动画 */
 .typing-indicator {
   display: flex;
   align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
 }
 
 .typing-indicator span {
-  height: 6px;
-  width: 6px;
-  background: #6366f1;
+  height: 8px;
+  width: 8px;
+  margin: 0 4px;
+  background-color: #8a6df1;
   border-radius: 50%;
   display: inline-block;
-  margin-right: 3px;
-  animation: typingBounce 1.5s infinite ease-in-out;
+  animation: dot-pulse 1.5s infinite ease-in-out;
 }
 
 .typing-indicator span:nth-child(2) {
@@ -961,15 +898,97 @@ const handleVisibilityChange = async () => {
 
 .typing-indicator span:nth-child(3) {
   animation-delay: 0.4s;
-  margin-right: 0;
 }
 
-@keyframes typingBounce {
-  0%, 60%, 100% {
-    transform: translateY(0);
+@keyframes dot-pulse {
+  0%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
   }
-  30% {
-    transform: translateY(-4px);
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
   }
+}
+
+/* Markdown内容样式 - 写作模式 */
+:deep(.prose) {
+  color: #e2e8f0;
+}
+
+:deep(.prose h1),
+:deep(.prose h2),
+:deep(.prose h3),
+:deep(.prose h4) {
+  color: white;
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
+}
+
+:deep(.prose p) {
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+:deep(.prose ul),
+:deep(.prose ol) {
+  margin-top: 1em;
+  margin-bottom: 1em;
+  padding-left: 1.5em;
+}
+
+:deep(.prose li) {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+:deep(.prose a) {
+  color: #8a6df1;
+  text-decoration: underline;
+}
+
+:deep(.prose blockquote) {
+  border-left: 4px solid #8a6df1;
+  padding-left: 1em;
+  font-style: italic;
+  color: #a0aec0;
+}
+
+:deep(.prose code) {
+  color: #f7fafc;
+  background: rgba(45, 45, 80, 0.5);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+:deep(.prose pre) {
+  background: #191637;
+  border-radius: 8px;
+  padding: 1em;
+  overflow-x: auto;
+}
+
+:deep(.prose pre code) {
+  background: transparent;
+  padding: 0;
+  color: #f7fafc;
+}
+
+:deep(.prose table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+:deep(.prose th),
+:deep(.prose td) {
+  padding: 0.5em;
+  border: 1px solid #4a5568;
+}
+
+:deep(.prose th) {
+  background: rgba(45, 45, 80, 0.5);
 }
 </style> 

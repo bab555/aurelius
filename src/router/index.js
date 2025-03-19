@@ -55,7 +55,7 @@ const router = createRouter({
     },
     {
       path: '/assistant/solution',
-      name: 'solution-assistant',
+      name: 'writing-assistant',
       component: () => import('../views/assistants/SolutionAssistant.vue')
     },
     {
@@ -162,6 +162,30 @@ const router = createRouter({
 
 // 设置中台权限守卫
 setupAdminGuard(router)
+
+// 添加导航守卫，防止在流式输出时跳转页面
+router.beforeEach((to, from, next) => {
+  if (window.streamingState && window.streamingState.shouldPreventRefresh()) {
+    // 页面内部导航不拦截，仅拦截跳转到其他页面的行为
+    if (to.path !== from.path) {
+      const message = window.streamingState.isStreaming 
+        ? '正在接收AI回复，离开页面将会中断消息并导致内容丢失。确定要继续吗？'
+        : '重要结果正在显示中，离开页面将丢失当前结果。确定要继续吗？';
+      const confirmed = window.confirm(message);
+      if (confirmed) {
+        // 用户确认要离开
+        next();
+      } else {
+        // 用户取消离开
+        next(false);
+      }
+    } else {
+      next();
+    }
+  } else {
+    next();
+  }
+});
 
 // 动态设置页面标题
 router.beforeEach((to, from, next) => {

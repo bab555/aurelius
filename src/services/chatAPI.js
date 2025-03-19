@@ -8,7 +8,7 @@ export const APP_TYPES = {
   TRAVEL: 'travel',           // 文旅助手
   DESTINY: 'destiny',         // 命理算命
   INTELLIGENT: 'intelligent', // 智能助手
-  SOLUTION: 'solution',       // 方案助手
+  SOLUTION: 'solution',       // 写作助手
   ENTERPRISE: 'enterprise',   // 企业助手
   // 后续可以添加更多应用类型
   IMAGE: 'image',             // 图像生成
