@@ -65,9 +65,10 @@ export async function getAccessToken() {
  * 
  * @param {string} imageUrl - 原始图片的base64或URL
  * @param {string} maskUrl - 标记图片的base64或URL
+ * @param {Object} rectArea - 矩形区域信息 {left, top, width, height}
  * @returns {Promise<string>} 修复后的图像base64
  */
-export async function imageInpainting(imageUrl, maskUrl) {
+export async function imageInpainting(imageUrl, maskUrl, rectArea = null) {
   console.log('===== 图像修复API调用开始 =====');
   
   if (!maskUrl) {
@@ -107,22 +108,22 @@ export async function imageInpainting(imageUrl, maskUrl) {
     '原图数据长度': imageBase64.length,
     '掩码数据长度': maskBase64.length,
     '原图前20字符': imageBase64.substring(0, 20),
-    '掩码前20字符': maskBase64.substring(0, 20)
+    '掩码前20字符': maskBase64.substring(0, 20),
+    '矩形区域': rectArea
   });
 
   // 根据百度API文档构建请求
   // 文档地址: https://cloud.baidu.com/doc/IMAGEPROCESS/s/ok3bclome
   const apiUrl = `https://aip.baidubce.com/rest/2.0/image-process/v1/inpainting?access_token=${token}`;
   
-  // 构建请求体 - 根据文档修改为JSON格式
-  // rectangle是必需参数，提供一个很小的区域以满足要求
+  // 构建请求体 - 使用用户选择的矩形区域
   const requestBody = {
     image: imageBase64,
     mask: maskBase64,
-    rectangle: [{ 'width': 10, 'top': 10, 'height': 10, 'left': 10 }]
+    rectangle: rectArea ? [rectArea] : [{ 'width': 10, 'top': 10, 'height': 10, 'left': 10 }]
   };
   
-  console.log('请求参数设置完成');
+  console.log('请求参数设置完成，矩形区域:', requestBody.rectangle);
 
   try {
     console.log('调用百度图像修复API...');
@@ -170,66 +171,116 @@ export async function imageInpainting(imageUrl, maskUrl) {
     return `data:image/jpeg;base64,${data.image}`;
   } catch (error) {
     console.error('图像修复API调用失败:', error);
+    
+    // 临时解决方案：如果API调用失败，尝试返回原图
+    if (error.message.includes('API请求失败') || 
+        error.message.includes('CORS') || 
+        error.message.includes('Failed to fetch')) {
+      console.warn('API调用失败，可能是CORS问题。请实现服务器端代理解决。');
+      return imageUrl; // 返回原图
+    }
+    
     throw error;
   }
 }
 
 /**
- * 图像清晰度增强API - 提升图片的清晰度
+ * 图像清晰度增强 - 提升图像清晰度和质量
  * 
  * @param {string} imageUrl - 原始图片的base64或URL
  * @returns {Promise<string>} 增强后的图像base64
  */
 export async function imageQualityEnhance(imageUrl) {
+  console.log('===== 图像清晰度增强API调用开始 =====');
+  
+  // 获取token
   const token = await getAccessToken();
   
   // 确保base64数据不包含前缀
   const extractPureBase64 = (url) => {
-    const parts = url.split('base64,');
-    return parts.length > 1 ? parts[1] : url;
+    if (!url) return '';
+    if (url.startsWith('data:image')) {
+      const parts = url.split('base64,');
+      return parts.length > 1 ? parts[1] : '';
+    }
+    return url;
   };
   
   const imageBase64 = extractPureBase64(imageUrl);
   
+  if (!imageBase64) {
+    throw new Error('无效的图像数据');
+  }
+  
+  // 验证base64大小不超过4M
+  const base64Length = imageBase64.length;
+  const sizeInBytes = base64Length * 0.75; // base64编码比原始数据大约大1/3
+  const maxSize = 4 * 1024 * 1024; // 4MB
+  
+  if (sizeInBytes > maxSize) {
+    throw new Error(`图像过大，base64大小为${Math.round(sizeInBytes/1024/1024, 2)}MB，不能超过4MB`);
+  }
+  
   // 清晰度增强API，根据文档：https://cloud.baidu.com/doc/IMAGEPROCESS/s/5k4i6mzqk
   const apiUrl = `https://aip.baidubce.com/rest/2.0/image-process/v1/image_definition_enhance?access_token=${token}`;
   
-  // 添加调试日志
-  console.debug('清晰度增强请求详情:', {
-    imageLength: imageBase64.length,
-    apiEndpoint: 'image_definition_enhance'
-  });
-  
-  const params = new URLSearchParams();
-  params.append('image', imageBase64);
-  
   try {
-    console.log('开始调用百度图像清晰度增强API...');
+    console.log('开始调用百度图像清晰度增强API，图像大小:', Math.round(sizeInBytes/1024), 'KB');
+    
+    // 将FormData转换为URLSearchParams以符合application/x-www-form-urlencoded格式
+    const searchParams = new URLSearchParams();
+    searchParams.append('image', imageBase64);
+    
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json'
       },
-      body: params
+      body: searchParams
     });
     
-    const data = await response.json();
-    console.log('百度API响应:', data);
+    if (!response.ok) {
+      // 处理HTTP错误
+      console.error('HTTP错误:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('错误响应:', errorText);
+      throw new Error(`百度API HTTP错误: ${response.status} ${response.statusText}`);
+    }
+    
+    const responseData = await response.text();
+    let data;
+    try {
+      data = JSON.parse(responseData);
+    } catch (e) {
+      console.error('解析响应失败:', e);
+      console.error('原始响应:', responseData);
+      throw new Error('解析API响应失败');
+    }
     
     if (data.error_code) {
-      console.error('API返回错误:', data);
-      throw new Error(`图像清晰度增强失败: ${data.error_msg}`);
+      console.error('百度API错误:', data);
+      throw new Error(`图像清晰度增强处理失败: ${data.error_msg} (错误码: ${data.error_code})`);
     }
     
-    if (!data?.image) {
+    if (!data.image) {
       console.error('API未返回图像数据:', data);
-      throw new Error('图像清晰度增强失败: 未返回处理结果');
+      throw new Error('图像清晰度增强处理失败: 未返回处理结果');
     }
     
+    console.log('图像清晰度增强处理成功');
     return `data:image/jpeg;base64,${data.image}`;
   } catch (error) {
     console.error('图像清晰度增强处理失败:', error);
+    
+    // 临时解决方案：如果API调用失败，尝试返回原图
+    if (error.message.includes('API请求失败') || 
+        error.message.includes('CORS') || 
+        error.message.includes('Failed to fetch')) {
+      console.warn('API调用失败，可能是CORS问题。请实现服务器端代理解决。');
+      return imageUrl; // 返回原图
+    }
+    
     throw error;
   }
 }
@@ -343,4 +394,311 @@ const validateImageParams = (image, mask) => {
   const maxSize = 10 * 1024 * 1024; // 10MB
   if (image.length > maxSize) throw new Error('原始图片大小超过10MB限制');
   if (mask.length > maxSize) throw new Error('掩码图片大小超过10MB限制');
-}; 
+};
+
+/**
+ * 图像去雾API - 去除图片中的雾霾，保持自然色彩
+ * 
+ * @param {string} imageUrl - 原始图片的base64或URL
+ * @returns {Promise<string>} 去雾后的图像base64
+ */
+export async function imageDehaze(imageUrl) {
+  console.log('===== 图像去雾API调用开始 =====');
+  
+  // 获取token
+  const token = await getAccessToken();
+  
+  // 确保base64数据不包含前缀
+  const extractPureBase64 = (url) => {
+    if (!url) return '';
+    if (url.startsWith('data:image')) {
+      const parts = url.split('base64,');
+      return parts.length > 1 ? parts[1] : '';
+    }
+    return url;
+  };
+  
+  const imageBase64 = extractPureBase64(imageUrl);
+  
+  if (!imageBase64) {
+    throw new Error('无效的图像数据');
+  }
+  
+  // 验证base64大小不超过4M
+  const base64Length = imageBase64.length;
+  const sizeInBytes = base64Length * 0.75; // base64编码比原始数据大约大1/3
+  const maxSize = 4 * 1024 * 1024; // 4MB
+  
+  if (sizeInBytes > maxSize) {
+    throw new Error(`图像过大，base64大小为${Math.round(sizeInBytes/1024/1024, 2)}MB，不能超过4MB`);
+  }
+  
+  // 图像去雾API，根据文档：https://cloud.baidu.com/doc/IMAGEPROCESS/s/nk3bcloer
+  const apiUrl = `https://aip.baidubce.com/rest/2.0/image-process/v1/dehaze?access_token=${token}`;
+  
+  try {
+    console.log('开始调用百度图像去雾API，图像大小:', Math.round(sizeInBytes/1024), 'KB');
+    
+    // 将FormData转换为URLSearchParams以符合application/x-www-form-urlencoded格式
+    const searchParams = new URLSearchParams();
+    searchParams.append('image', imageBase64);
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
+      },
+      body: searchParams
+    });
+    
+    if (!response.ok) {
+      // 处理HTTP错误
+      console.error('HTTP错误:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('错误响应:', errorText);
+      throw new Error(`百度API HTTP错误: ${response.status} ${response.statusText}`);
+    }
+    
+    const responseData = await response.text();
+    let data;
+    try {
+      data = JSON.parse(responseData);
+    } catch (e) {
+      console.error('解析响应失败:', e);
+      console.error('原始响应:', responseData);
+      throw new Error('解析API响应失败');
+    }
+    
+    if (data.error_code) {
+      console.error('百度API错误:', data);
+      throw new Error(`图像去雾处理失败: ${data.error_msg} (错误码: ${data.error_code})`);
+    }
+    
+    if (!data.image) {
+      console.error('API未返回图像数据:', data);
+      throw new Error('图像去雾处理失败: 未返回处理结果');
+    }
+    
+    console.log('图像去雾处理成功');
+    return `data:image/jpeg;base64,${data.image}`;
+  } catch (error) {
+    console.error('图像去雾处理失败:', error);
+    
+    // 临时解决方案：如果API调用失败，尝试返回原图
+    if (error.message.includes('API请求失败') || 
+        error.message.includes('CORS') || 
+        error.message.includes('Failed to fetch')) {
+      console.warn('API调用失败，可能是CORS问题。请实现服务器端代理解决。');
+      return imageUrl; // 返回原图
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * 黑白图像上色API - 为黑白图像增加自然的颜色
+ * 
+ * @param {string} imageUrl - 原始图片的base64或URL
+ * @returns {Promise<string>} 上色后的图像base64
+ */
+export async function imageColoring(imageUrl) {
+  console.log('===== 黑白图像上色API调用开始 =====');
+  
+  // 获取token
+  const token = await getAccessToken();
+  
+  // 确保base64数据不包含前缀
+  const extractPureBase64 = (url) => {
+    if (!url) return '';
+    if (url.startsWith('data:image')) {
+      const parts = url.split('base64,');
+      return parts.length > 1 ? parts[1] : '';
+    }
+    return url;
+  };
+  
+  const imageBase64 = extractPureBase64(imageUrl);
+  
+  if (!imageBase64) {
+    throw new Error('无效的图像数据');
+  }
+  
+  // 验证base64大小不超过4M
+  const base64Length = imageBase64.length;
+  const sizeInBytes = base64Length * 0.75; // base64编码比原始数据大约大1/3
+  const maxSize = 4 * 1024 * 1024; // 4MB
+  
+  if (sizeInBytes > maxSize) {
+    throw new Error(`图像过大，base64大小为${Math.round(sizeInBytes/1024/1024, 2)}MB，不能超过4MB`);
+  }
+  
+  // 黑白图像上色API，根据文档：https://cloud.baidu.com/doc/IMAGEPROCESS/s/Bk3bclns3
+  const apiUrl = `https://aip.baidubce.com/rest/2.0/image-process/v1/colourize?access_token=${token}`;
+  
+  try {
+    console.log('开始调用百度黑白图像上色API，图像大小:', Math.round(sizeInBytes/1024), 'KB');
+    
+    // 将FormData转换为URLSearchParams以符合application/x-www-form-urlencoded格式
+    const searchParams = new URLSearchParams();
+    searchParams.append('image', imageBase64);
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
+      },
+      body: searchParams
+    });
+    
+    if (!response.ok) {
+      // 处理HTTP错误
+      console.error('HTTP错误:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('错误响应:', errorText);
+      throw new Error(`百度API HTTP错误: ${response.status} ${response.statusText}`);
+    }
+    
+    const responseData = await response.text();
+    let data;
+    try {
+      data = JSON.parse(responseData);
+    } catch (e) {
+      console.error('解析响应失败:', e);
+      console.error('原始响应:', responseData);
+      throw new Error('解析API响应失败');
+    }
+    
+    if (data.error_code) {
+      console.error('百度API错误:', data);
+      throw new Error(`黑白图像上色处理失败: ${data.error_msg} (错误码: ${data.error_code})`);
+    }
+    
+    if (!data.image) {
+      console.error('API未返回图像数据:', data);
+      throw new Error('黑白图像上色处理失败: 未返回处理结果');
+    }
+    
+    console.log('黑白图像上色处理成功');
+    return `data:image/jpeg;base64,${data.image}`;
+  } catch (error) {
+    console.error('黑白图像上色处理失败:', error);
+    
+    // 临时解决方案：如果API调用失败，尝试返回原图
+    if (error.message.includes('API请求失败') || 
+        error.message.includes('CORS') || 
+        error.message.includes('Failed to fetch')) {
+      console.warn('API调用失败，可能是CORS问题。请实现服务器端代理解决。');
+      return imageUrl; // 返回原图
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * 图像无损放大API - 提升图像分辨率，保持清晰度
+ * 
+ * @param {string} imageUrl - 原始图片的base64或URL
+ * @returns {Promise<string>} 放大后的图像base64
+ */
+export async function imageSuperResolution(imageUrl) {
+  console.log('===== 图像无损放大API调用开始 =====');
+  
+  // 获取token
+  const token = await getAccessToken();
+  
+  // 确保base64数据不包含前缀
+  const extractPureBase64 = (url) => {
+    if (!url) return '';
+    if (url.startsWith('data:image')) {
+      const parts = url.split('base64,');
+      return parts.length > 1 ? parts[1] : '';
+    }
+    return url;
+  };
+  
+  const imageBase64 = extractPureBase64(imageUrl);
+  
+  if (!imageBase64) {
+    throw new Error('无效的图像数据');
+  }
+  
+  // 验证base64大小不超过4M
+  const base64Length = imageBase64.length;
+  const sizeInBytes = base64Length * 0.75; // base64编码比原始数据大约大1/3
+  const maxSize = 4 * 1024 * 1024; // 4MB
+  
+  if (sizeInBytes > maxSize) {
+    throw new Error(`图像过大，base64大小为${Math.round(sizeInBytes/1024/1024, 2)}MB，不能超过4MB`);
+  }
+  
+  // 图像无损放大API，根据文档：https://cloud.baidu.com/doc/IMAGEPROCESS/s/ok3bclnkg
+  const apiUrl = `https://aip.baidubce.com/rest/2.0/image-process/v1/image_quality_enhance?access_token=${token}`;
+  
+  try {
+    console.log('开始调用百度图像无损放大API，图像大小:', Math.round(sizeInBytes/1024), 'KB');
+    
+    // 将FormData转换为URLSearchParams以符合application/x-www-form-urlencoded格式
+    const searchParams = new URLSearchParams();
+    searchParams.append('image', imageBase64);
+    // 设置放大选项，默认值为"original"保持原始比例
+    searchParams.append('option', 'sample_ratio');
+    // 放大倍数，2表示放大2倍
+    searchParams.append('sample_ratio', 2);
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
+      },
+      body: searchParams
+    });
+    
+    if (!response.ok) {
+      // 处理HTTP错误
+      console.error('HTTP错误:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('错误响应:', errorText);
+      throw new Error(`百度API HTTP错误: ${response.status} ${response.statusText}`);
+    }
+    
+    const responseData = await response.text();
+    let data;
+    try {
+      data = JSON.parse(responseData);
+    } catch (e) {
+      console.error('解析响应失败:', e);
+      console.error('原始响应:', responseData);
+      throw new Error('解析API响应失败');
+    }
+    
+    if (data.error_code) {
+      console.error('百度API错误:', data);
+      throw new Error(`图像无损放大处理失败: ${data.error_msg} (错误码: ${data.error_code})`);
+    }
+    
+    if (!data.image) {
+      console.error('API未返回图像数据:', data);
+      throw new Error('图像无损放大处理失败: 未返回处理结果');
+    }
+    
+    console.log('图像无损放大处理成功');
+    return `data:image/jpeg;base64,${data.image}`;
+  } catch (error) {
+    console.error('图像无损放大处理失败:', error);
+    
+    // 临时解决方案：如果API调用失败，尝试返回原图
+    if (error.message.includes('API请求失败') || 
+        error.message.includes('CORS') || 
+        error.message.includes('Failed to fetch')) {
+      console.warn('API调用失败，可能是CORS问题。请实现服务器端代理解决。');
+      return imageUrl; // 返回原图
+    }
+    
+    throw error;
+  }
+} 

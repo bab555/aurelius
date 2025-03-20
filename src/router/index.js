@@ -91,7 +91,7 @@ const router = createRouter({
     // 智能工具集子页面
     {
       path: '/tools/photo-restoration',
-      name: 'photo-restoration',
+      name: 'image-processing',
       component: () => import('../views/tools/PhotoRestoration.vue')
     },
     {

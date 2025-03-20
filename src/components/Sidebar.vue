@@ -154,7 +154,7 @@
                 @click.prevent="handleNavClick('/tools/photo-restoration', $event)"
               >
                 <i class="fas fa-camera-retro w-5 h-5 flex items-center justify-center mr-2"></i>
-                <span>照片修复</span>
+                <span>图像处理</span>
               </a>
               <a 
                 href="/tools/voice-synthesis" 

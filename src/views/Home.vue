@@ -48,7 +48,7 @@
             </div>
           </div>
           
-          <!-- 工具卡片 3 - 照片修复 -->
+          <!-- 工具卡片 3 - 图像处理 -->
           <div class="tool-card bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-5 border border-primary/20 hover:border-primary/50 transition-all cursor-pointer"
                @click="navigateTo('/tools/photo-restoration')">
             <div class="flex items-start">
@@ -56,8 +56,8 @@
                 <i class="fas fa-camera-retro text-primary text-xl"></i>
               </div>
               <div>
-                <h3 class="text-lg font-semibold mb-1">照片修复</h3>
-                <p class="text-sm text-gray-400 mb-4">老照片修复翻新、照片增强、去除污损和瑕疵，恢复珍贵记忆</p>
+                <h3 class="text-lg font-semibold mb-1">图像处理</h3>
+                <p class="text-sm text-gray-400 mb-4">照片增强、去除杂物、黑白上色、图像去雾，多功能图像处理平台</p>
                 <div class="text-primary hover:text-primary/80 text-sm flex items-center">
                   立即体验
                   <i class="fas fa-chevron-right ml-1 text-xs"></i>
