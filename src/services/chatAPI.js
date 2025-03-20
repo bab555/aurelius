@@ -10,6 +10,7 @@ export const APP_TYPES = {
   INTELLIGENT: 'intelligent', // 智能助手
   SOLUTION: 'solution',       // 写作助手
   ENTERPRISE: 'enterprise',   // 企业助手
+  SEARCH: 'search',           // 搜索助手
   // 后续可以添加更多应用类型
   IMAGE: 'image',             // 图像生成
   VOICE: 'voice',             // 语音合成
@@ -38,6 +39,11 @@ export const getCredentials = (appType = APP_TYPES.TRAVEL) => {
       return {
         appId: import.meta.env.VITE_ENTERPRISE_APP_ID,
         apiKey: import.meta.env.VITE_ENTERPRISE_API_KEY
+      };
+    case APP_TYPES.SEARCH:
+      return {
+        appId: import.meta.env.VITE_SEARCH_APP_ID,
+        apiKey: import.meta.env.VITE_SEARCH_API_KEY
       };
     case APP_TYPES.IMAGE:
       // 预留图像生成API凭证

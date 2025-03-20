@@ -581,4 +581,4 @@ const resetAll = () => {
   brushSize.value = 20
   clearMask()
 }
-</script>
+</script> 

@@ -333,7 +333,7 @@ const saveHistory = () => {
   // 保存到本地存储
   localStorage.setItem('voiceSynthesisHistory', JSON.stringify(history.value));
 };
-</script>
+</script> 
 
 <style scoped>
 /* 自定义滑块样式 */

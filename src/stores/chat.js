@@ -145,14 +145,28 @@ export const useChatStore = defineStore('chat', () => {
   const setupButtonResetSafeguard = () => {
     setInterval(() => {
       const now = Date.now();
-      // 只有当超过10秒没有收到更新且没有正在流式处理的消息时才重置
-      if (isLoading.value && lastMessageUpdateTime.value > 0 && (now - lastMessageUpdateTime.value > 10000)) {
+      
+      // 根据应用类型设置不同的超时时间
+      let timeoutLimit = 10000; // 默认10秒
+      
+      // 为搜索助手设置更长的超时时间，因为可能需要调用外部工具
+      if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+        timeoutLimit = 30000; // 搜索助手使用30秒超时
+        logDebug('搜索助手使用更长的超时限制:', { timeout: timeoutLimit });
+      }
+      
+      // 只有当超过设定时间没有收到更新且没有正在流式处理的消息时才重置
+      if (isLoading.value && lastMessageUpdateTime.value > 0 && (now - lastMessageUpdateTime.value > timeoutLimit)) {
         // 查找是否有正在流式处理的消息
         const streamingMsg = messages.value.find(m => m.isStreaming);
         
         // 只有当没有正在流式处理的消息时，才重置状态
         if (!streamingMsg) {
-          logDebug('检测到长时间无更新且无流式消息，重置按钮状态', { lastUpdate: new Date(lastMessageUpdateTime.value) });
+          logDebug('检测到长时间无更新且无流式消息，重置按钮状态', { 
+            lastUpdate: new Date(lastMessageUpdateTime.value),
+            timeout: timeoutLimit,
+            appType: currentAppType.value
+          });
           isLoading.value = false;
           lastMessageUpdateTime.value = 0;
         } else {
@@ -253,13 +267,22 @@ export const useChatStore = defineStore('chat', () => {
         if (error.message && error.message.includes('Conversation Not Exists')) {
           logDebug('会话不存在，使用空会话ID重试', { oldId: currentConversationId.value });
           
-          // 清除当前会话ID并在本地存储中删除
+          // 清除当前会话ID
           if (currentAppType.value === chatAPI.APP_TYPES.TRAVEL) {
             sessionStorage.removeItem('travel_conversation_id');
           } else if (currentAppType.value === chatAPI.APP_TYPES.DESTINY) {
             sessionStorage.removeItem('destiny_conversation_id');
+          } else if (currentAppType.value === chatAPI.APP_TYPES.INTELLIGENT) {
+            sessionStorage.removeItem('intelligent_conversation_id');
+          } else if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+            sessionStorage.removeItem('search_conversation_id');
           }
+          
+          // 设置为空会话ID
           currentConversationId.value = '';
+          messages.value = []; // 清除消息列表
+          
+          logDebug('已清除会话ID，下次请求将创建新会话');
           
           // 更新消息中的会话ID
           userMessage.conversation_id = '';
@@ -515,6 +538,10 @@ export const useChatStore = defineStore('chat', () => {
             sessionStorage.removeItem('travel_conversation_id');
           } else if (currentAppType.value === chatAPI.APP_TYPES.DESTINY) {
             sessionStorage.removeItem('destiny_conversation_id');
+          } else if (currentAppType.value === chatAPI.APP_TYPES.INTELLIGENT) {
+            sessionStorage.removeItem('intelligent_conversation_id');
+          } else if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+            sessionStorage.removeItem('search_conversation_id');
           }
           
           // 设置为空会话ID
@@ -886,7 +913,16 @@ export const useChatStore = defineStore('chat', () => {
     
     try {
       isStreaming.value = true;
+      lastMessage.isStreaming = true; // 确保消息对象也标记为流式状态
       lastMessageUpdateTime.value = Date.now();
+      
+      // 为搜索助手添加额外的跟踪日志
+      if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+        logDebug('搜索助手开始接收流式数据', { 
+          time: new Date().toISOString(),
+          messageId: lastMessage.id
+        });
+      }
       
       // 读取流数据
       while (true) {
@@ -895,36 +931,129 @@ export const useChatStore = defineStore('chat', () => {
         if (done) {
           isStreaming.value = false;
           lastMessage.isStreaming = false;
+          
+          // 为搜索助手记录流式数据结束
+          if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+            logDebug('搜索助手流式数据传输完成', { 
+              time: new Date().toISOString(),
+              messageId: lastMessage.id
+            });
+          }
+          
           break;
         }
         
         // 解码数据并添加到缓冲区
-        buffer += textDecoder.decode(value, { stream: true });
+        const decodedChunk = textDecoder.decode(value, { stream: true });
+        buffer += decodedChunk;
+        
+        // 为搜索助手记录接收到数据块
+        if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+          logDebug('搜索助手接收到数据块', { 
+            time: new Date().toISOString(),
+            dataLength: value.length,
+            // 添加新的日志信息来显示原始数据块(最多显示前150个字符)
+            preview: decodedChunk.length > 150 ? decodedChunk.substring(0, 150) + '...' : decodedChunk
+          });
+        }
         
         // 处理缓冲区中的完整事件
         const lines = buffer.split('\n\n');
         buffer = lines.pop() || '';
         
+        if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+          logDebug('搜索助手处理数据行', { 
+            lineCount: lines.length,
+            bufferRemaining: buffer.length
+          });
+        }
+        
         for (const line of lines) {
-          if (!line.trim() || !line.startsWith('data: ')) continue;
+          if (!line.trim() || !line.startsWith('data: ')) {
+            if (currentAppType.value === chatAPI.APP_TYPES.SEARCH && line.trim()) {
+              logDebug('搜索助手跳过非数据行', {
+                lineContent: line.length > 50 ? line.substring(0, 50) + '...' : line
+              });
+            }
+            continue;
+          }
           
           try {
             // 提取JSON数据
             const jsonStr = line.slice(6); // 去掉 "data: "
+            
+            if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+              logDebug('搜索助手尝试解析JSON', {
+                jsonPreview: jsonStr.length > 50 ? jsonStr.substring(0, 50) + '...' : jsonStr
+              });
+            }
+            
             const data = JSON.parse(jsonStr);
+            
+            if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+              logDebug('搜索助手JSON解析成功', {
+                event: data.event,
+                hasAnswer: !!data.answer,
+                answerLength: data.answer?.length || 0
+              });
+            }
             
             // 处理不同类型的事件
             if (data.event === 'message') {
+              // 更多日志用于调试
+              if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+                logDebug('搜索助手接收到message事件', {
+                  time: new Date().toISOString(),
+                  messageIndex: assistantMessageIndex,
+                  hasCurrentMessage: assistantMessageIndex >= 0 && assistantMessageIndex < messages.value.length,
+                  hasAnswer: !!data.answer,
+                  answerLength: data.answer?.length || 0,
+                  currentContentLength: messageContent.length
+                });
+              }
+              
               // 更新消息内容
+              const previousLength = messageContent.length;
               messageContent += data.answer || '';
               
               // 更新消息对象
-              messages.value[assistantMessageIndex].content = messageContent;
+              if (assistantMessageIndex >= 0 && assistantMessageIndex < messages.value.length) {
+                const previousContent = messages.value[assistantMessageIndex].content;
+                messages.value[assistantMessageIndex].content = messageContent;
+                
+                // 搜索助手特殊日志
+                if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+                  logDebug('搜索助手更新消息内容', {
+                    time: new Date().toISOString(),
+                    messageIndex: assistantMessageIndex,
+                    contentBefore: previousContent.length,
+                    contentAfter: messages.value[assistantMessageIndex].content.length,
+                    contentChanged: previousContent !== messages.value[assistantMessageIndex].content,
+                    receivedContent: (data.answer || '').length,
+                    totalContentLength: messageContent.length
+                  });
+                }
+              } else if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+                logDebug('搜索助手更新消息失败', {
+                  time: new Date().toISOString(),
+                  messageIndex: assistantMessageIndex,
+                  messagesLength: messages.value.length,
+                  receivedContent: (data.answer || '').length
+                });
+              }
               
               // 记录taskId用于可能的停止请求
               if (data.task_id && !taskId) {
                 taskId = data.task_id;
                 currentTask.value = taskId;
+                
+                // 搜索助手特殊日志
+                if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+                  logDebug('搜索助手设置任务ID', {
+                    time: new Date().toISOString(),
+                    taskId
+                  });
+                }
               }
               
               // 更新会话ID (如果存在且当前无会话ID)
@@ -941,6 +1070,165 @@ export const useChatStore = defineStore('chat', () => {
               }
               
               // 更新时间戳，用于防超时保护
+              lastMessageUpdateTime.value = Date.now();
+            } else if (data.event === 'agent_message') {
+              // Agent模式下返回文本块事件，处理方式类似message事件
+              if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+                logDebug('搜索助手接收到agent_message事件', {
+                  time: new Date().toISOString(),
+                  messageIndex: assistantMessageIndex,
+                  hasCurrentMessage: assistantMessageIndex >= 0 && assistantMessageIndex < messages.value.length,
+                  hasAnswer: !!data.answer,
+                  answerLength: data.answer?.length || 0,
+                  currentContentLength: messageContent.length
+                });
+              }
+              
+              // 更新消息内容
+              messageContent += data.answer || '';
+              
+              // 更新消息对象
+              if (assistantMessageIndex >= 0 && assistantMessageIndex < messages.value.length) {
+                messages.value[assistantMessageIndex].content = messageContent;
+                
+                // 搜索助手特殊日志
+                if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+                  logDebug('搜索助手更新agent_message内容', {
+                    time: new Date().toISOString(),
+                    messageIndex: assistantMessageIndex,
+                    receivedContent: (data.answer || '').length,
+                    totalContentLength: messageContent.length
+                  });
+                }
+              }
+              
+              // 处理会话ID和消息ID，与message事件类似
+              if (data.task_id && !taskId) {
+                taskId = data.task_id;
+                currentTask.value = taskId;
+              }
+              
+              if (data.conversation_id && !currentConversationId.value) {
+                currentConversationId.value = data.conversation_id;
+                messages.value[assistantMessageIndex].conversation_id = data.conversation_id;
+              }
+              
+              if (data.message_id) {
+                messages.value[assistantMessageIndex].id = data.message_id;
+              }
+              
+              // 更新时间戳
+              lastMessageUpdateTime.value = Date.now();
+            } else if (data.event === 'agent_thought') {
+              // Agent模式下的思考步骤内容
+              if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+                logDebug('搜索助手接收到agent_thought事件', {
+                  time: new Date().toISOString(),
+                  thoughtId: data.id,
+                  position: data.position,
+                  taskId: data.task_id,
+                  messageId: data.message_id,
+                  thoughtLength: (data.thought || '').length,
+                  tool: data.tool,
+                  hasToolInput: !!data.tool_input
+                });
+              }
+              
+              // 不再构建和显示任何思考内容
+              // let thoughtContent = '';
+              
+              // if (data.thought) {
+              //   thoughtContent += `思考: ${data.position || ''}\n${data.thought || ''}\n\n`;
+              // }
+              
+              // if (data.tool) {
+              //   thoughtContent += `使用工具: ${data.tool}\n\n`;
+              
+              //   if (data.tool_input) {
+              //     try {
+              //       // 尝试将JSON字符串转换为可读形式，但不添加高亮
+              //       const toolInputObj = JSON.parse(data.tool_input);
+              //       thoughtContent += `工具输入:\n${JSON.stringify(toolInputObj, null, 2)}\n\n`;
+              //     } catch (e) {
+              //       // 如果解析失败，直接显示原始内容
+              //       thoughtContent += `工具输入: ${data.tool_input}\n\n`;
+              //     }
+              //   }
+              // }
+              
+              // // 将思考内容追加到消息中
+              // if (thoughtContent) {
+              //   messageContent += thoughtContent;
+              
+              //   // 更新消息对象
+              //   if (assistantMessageIndex >= 0 && assistantMessageIndex < messages.value.length) {
+              //     messages.value[assistantMessageIndex].content = messageContent;
+              
+              //     // 搜索助手特殊日志
+              //     if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+              //       logDebug('搜索助手更新agent_thought内容', {
+              //         time: new Date().toISOString(),
+              //         messageIndex: assistantMessageIndex,
+              //         thoughtContentLength: thoughtContent.length,
+              //         totalContentLength: messageContent.length
+              //       });
+              //     }
+              //   }
+              // }
+              
+              // 处理任务ID
+              if (data.task_id && !taskId) {
+                taskId = data.task_id;
+                currentTask.value = taskId;
+              }
+              
+              // 处理会话ID
+              if (data.conversation_id && !currentConversationId.value) {
+                currentConversationId.value = data.conversation_id;
+                if (assistantMessageIndex >= 0 && assistantMessageIndex < messages.value.length) {
+                  messages.value[assistantMessageIndex].conversation_id = data.conversation_id;
+                }
+              }
+              
+              // 更新时间戳
+              lastMessageUpdateTime.value = Date.now();
+            } else if (data.event === 'message_file') {
+              // 处理文件事件
+              if (currentAppType.value === chatAPI.APP_TYPES.SEARCH) {
+                logDebug('搜索助手接收到message_file事件', {
+                  time: new Date().toISOString(),
+                  fileId: data.id,
+                  fileType: data.type,
+                  belongsTo: data.belongs_to
+                });
+              }
+              
+              // 目前仅处理图片类型文件
+              if (data.type === 'image' && data.url) {
+                // 构建图片Markdown格式
+                const imageMarkdown = `\n\n![图片](${data.url})\n\n`;
+                
+                // 添加到消息内容
+                messageContent += imageMarkdown;
+                
+                // 更新消息对象
+                if (assistantMessageIndex >= 0 && assistantMessageIndex < messages.value.length) {
+                  messages.value[assistantMessageIndex].content = messageContent;
+                  
+                  // 记录文件信息到消息对象
+                  if (!messages.value[assistantMessageIndex].files) {
+                    messages.value[assistantMessageIndex].files = [];
+                  }
+                  
+                  messages.value[assistantMessageIndex].files.push({
+                    id: data.id,
+                    type: data.type,
+                    url: data.url
+                  });
+                }
+              }
+              
+              // 更新时间戳
               lastMessageUpdateTime.value = Date.now();
             } else if (data.event === 'message_end') {
               // 标记接收到了消息结束事件

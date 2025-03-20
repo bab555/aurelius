@@ -445,7 +445,14 @@ const sendMessage = async () => {
           await chatStore.sendMessage(content);
         } else {
           // 显示错误消息给用户
-          chatStore.addSystemMessage(`文件上传失败: ${error.message || '未知错误'}`);
+          messages.value.push({
+            id: crypto.randomUUID(),
+            conversation_id: chatStore.currentConversationId || '',
+            role: 'assistant',
+            content: `⚠️ 文件上传失败: ${error.message || '未知错误'}`,
+            created_at: Date.now() / 1000,
+            isError: true
+          });
           return;
         }
       } finally {
