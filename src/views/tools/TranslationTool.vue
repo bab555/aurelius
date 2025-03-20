@@ -1,5 +1,5 @@
 <template>
-  <PlaceholderPage title="翻译工具" />
+  <PlaceholderPage title="翻译助手" />
 </template>
 
 <script setup>

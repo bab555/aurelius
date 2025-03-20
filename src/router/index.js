@@ -88,6 +88,11 @@ const router = createRouter({
       name: 'virtual-assistant',
       component: () => import('../views/assistants/VirtualAssistant.vue')
     },
+    {
+      path: '/assistant/translation',
+      name: 'translation-assistant',
+      component: () => import('../views/tools/TranslationTool.vue')
+    },
     // 智能工具集子页面
     {
       path: '/tools/photo-restoration',
@@ -101,13 +106,13 @@ const router = createRouter({
     },
     {
       path: '/tools/text-to-video',
-      name: 'text-to-video',
+      name: 'smart-video',
       component: () => import('../views/tools/TextToVideo.vue')
     },
     {
       path: '/tools/translation',
       name: 'translation-tool',
-      component: () => import('../views/tools/TranslationTool.vue')
+      redirect: '/assistant/translation'
     },
     {
       path: '/tools/image-recognition',
@@ -116,7 +121,7 @@ const router = createRouter({
     },
     {
       path: '/tools/digital-human',
-      name: 'digital-human',
+      name: 'smart-image',
       component: () => import('../views/tools/DigitalHuman.vue')
     },
     {

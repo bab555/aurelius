@@ -129,6 +129,15 @@
                 <i class="fas fa-headset w-5 h-5 flex items-center justify-center mr-2"></i>
                 <span>虚拟客服</span>
               </a>
+              <a 
+                href="/assistant/translation" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/assistant/translation'}"
+                @click.prevent="handleNavClick('/assistant/translation', $event)"
+              >
+                <i class="fas fa-language w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>翻译助手</span>
+              </a>
             </div>
           </div>
           
@@ -172,16 +181,7 @@
                 @click.prevent="handleNavClick('/tools/text-to-video', $event)"
               >
                 <i class="fas fa-film w-5 h-5 flex items-center justify-center mr-2"></i>
-                <span>文生视频</span>
-              </a>
-              <a 
-                href="/tools/translation" 
-                class="text-gray-400 hover:text-white block py-2 flex items-center"
-                :class="{'text-primary': currentPath === '/tools/translation'}"
-                @click.prevent="handleNavClick('/tools/translation', $event)"
-              >
-                <i class="fas fa-language w-5 h-5 flex items-center justify-center mr-2"></i>
-                <span>翻译工具</span>
+                <span>智能视频</span>
               </a>
               <a 
                 href="/tools/image-recognition" 
@@ -199,7 +199,7 @@
                 @click.prevent="handleNavClick('/tools/digital-human', $event)"
               >
                 <i class="fas fa-user-circle w-5 h-5 flex items-center justify-center mr-2"></i>
-                <span>图片数字人</span>
+                <span>智能生图</span>
               </a>
               <a 
                 href="/tools/virtual-try-on" 
