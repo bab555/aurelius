@@ -198,7 +198,7 @@
                 :class="{'text-primary': currentPath === '/tools/digital-human'}"
                 @click.prevent="handleNavClick('/tools/digital-human', $event)"
               >
-                <i class="fas fa-user-circle w-5 h-5 flex items-center justify-center mr-2"></i>
+                <i class="fas fa-image w-5 h-5 flex items-center justify-center mr-2"></i>
                 <span>智能生图</span>
               </a>
               <a 

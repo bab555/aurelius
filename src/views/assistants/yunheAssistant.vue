@@ -158,10 +158,10 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
-import { useChatStore } from '../stores/chat'
-import MessageFormatter from '../components/MessageFormatter.vue'
-import * as swManager from '../services/swManager'
-import * as chatAPI from '../services/chatAPI'
+import { useChatStore } from '../../stores/chat'
+import MessageFormatter from '../../components/MessageFormatter.vue'
+import * as swManager from '../../services/swManager'
+import * as chatAPI from '../../services/chatAPI'
 import { useRouter } from 'vue-router'
 
 // 使用聊天状态存储

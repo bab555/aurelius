@@ -18,7 +18,7 @@ const router = createRouter({
     {
       path: '/assistant',
       name: 'assistant',
-      component: () => import('../views/Assistant.vue')
+      component: () => import('../views/assistants/yunheAssistant.vue')
     },
     {
       path: '/chat',
@@ -91,7 +91,7 @@ const router = createRouter({
     {
       path: '/assistant/translation',
       name: 'translation-assistant',
-      component: () => import('../views/tools/TranslationTool.vue')
+      component: () => import('../views/assistants/TranslationTool.vue')
     },
     // 智能工具集子页面
     {
@@ -121,8 +121,8 @@ const router = createRouter({
     },
     {
       path: '/tools/digital-human',
-      name: 'smart-image',
-      component: () => import('../views/tools/DigitalHuman.vue')
+      name: 'text-to-image',
+      component: () => import('../views/tools/TextToImage.vue')
     },
     {
       path: '/tools/virtual-try-on',
