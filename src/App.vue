@@ -19,6 +19,9 @@
     <template v-else>
       <router-view />
     </template>
+    
+    <!-- 刷新保护通知器 -->
+    <RefreshProtectionNotifier />
   </div>
 </template>
 
@@ -26,6 +29,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import Sidebar from './components/Sidebar.vue'
+import RefreshProtectionNotifier from './components/RefreshProtectionNotifier.vue'
 
 const route = useRoute()
 
