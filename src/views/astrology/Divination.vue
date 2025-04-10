@@ -127,9 +127,9 @@
         </div>
       </div>
 
-      <!-- 用户输入表单 -->
-      <div class="fixed bottom-0 w-full left-0 right-0 p-4 z-10 bg-gray-950 bg-opacity-80 backdrop-blur-sm">
-        <div class="flex items-center bg-gray-900 rounded-lg shadow-lg border border-gray-800 w-full max-w-full mx-auto md:ml-[60px] md:w-[calc(100%-92px)]">
+      <!-- 用户输入表单 - 从fixed定位改为流式布局 -->
+      <div class="mt-4 flex-shrink-0 bg-gray-950 bg-opacity-80 backdrop-blur-sm rounded-lg">
+        <div class="flex items-center bg-gray-900 rounded-lg shadow-lg border border-gray-800 w-full">
           <textarea 
             ref="textareaRef"
             v-model="userInput" 
