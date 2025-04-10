@@ -11,7 +11,7 @@
         <div class="flex justify-between items-center">
           <div>
             <h1 class="text-2xl md:text-3xl font-bold text-white mb-2">命理算师</h1>
-            <p class="text-gray-400 text-sm">独家完美实现古籍与程序结合八字传统排盘算法，基于古籍的严谨测算，精确分析命格，无限伦次对话，预测命运轨迹</p>
+            <p class="text-gray-400 text-sm">独家完美实现古籍与程序结合八字传统排盘算法，基于《三命通会》《渊海子平》《滴天髓》等古籍的严谨测算，精确分析命格，无限伦次对话，预测命运轨迹</p>
           </div>
           <button 
             @click="showBirthForm" 
@@ -128,8 +128,8 @@
       </div>
 
       <!-- 用户输入表单 -->
-      <div class="fixed bottom-0 w-full max-w-4xl px-4 pb-4 z-10 bg-gray-950 bg-opacity-80 backdrop-blur-sm">
-        <div class="flex items-center bg-gray-900 rounded-lg shadow-lg border border-gray-800">
+      <div class="fixed bottom-0 w-full left-0 right-0 p-4 z-10 bg-gray-950 bg-opacity-80 backdrop-blur-sm">
+        <div class="flex items-center bg-gray-900 rounded-lg shadow-lg border border-gray-800 w-full max-w-full mx-auto md:ml-[60px] md:w-[calc(100%-92px)]">
           <textarea 
             ref="textareaRef"
             v-model="userInput" 

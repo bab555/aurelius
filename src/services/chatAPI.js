@@ -7,6 +7,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 export const APP_TYPES = {
   TRAVEL: 'travel',           // 文旅助手
   DESTINY: 'destiny',         // 命理算命
+  DIVINATION: 'divination',   // 卦师
   INTELLIGENT: 'intelligent', // 智能助手
   SOLUTION: 'solution',       // 写作助手
   ENTERPRISE: 'enterprise',   // 企业助手
@@ -24,6 +25,11 @@ export const getCredentials = (appType = APP_TYPES.TRAVEL) => {
       return {
         appId: import.meta.env.VITE_DESTINY_APP_ID,
         apiKey: import.meta.env.VITE_DESTINY_API_KEY
+      };
+    case APP_TYPES.DIVINATION:
+      return {
+        appId: import.meta.env.VITE_DIVINATION_APP_ID,
+        apiKey: import.meta.env.VITE_DIVINATION_API_KEY
       };
     case APP_TYPES.INTELLIGENT:
       return {

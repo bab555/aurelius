@@ -82,7 +82,7 @@
                 @click.prevent="handleNavClick('/assistant/image', $event)"
               >
                 <i class="far fa-image w-5 h-5 flex items-center justify-center mr-2"></i>
-                <span>生图助手</span>
+                <span>提示词助手</span>
               </a>
               <a 
                 href="/assistant/image-text" 
@@ -128,15 +128,6 @@
               >
                 <i class="fas fa-headset w-5 h-5 flex items-center justify-center mr-2"></i>
                 <span>虚拟客服</span>
-              </a>
-              <a 
-                href="/assistant/translation" 
-                class="text-gray-400 hover:text-white block py-2 flex items-center"
-                :class="{'text-primary': currentPath === '/assistant/translation'}"
-                @click.prevent="handleNavClick('/assistant/translation', $event)"
-              >
-                <i class="fas fa-language w-5 h-5 flex items-center justify-center mr-2"></i>
-                <span>翻译助手</span>
               </a>
             </div>
           </div>
@@ -184,15 +175,6 @@
                 <span>智能视频</span>
               </a>
               <a 
-                href="/tools/image-recognition" 
-                class="text-gray-400 hover:text-white block py-2 flex items-center"
-                :class="{'text-primary': currentPath === '/tools/image-recognition'}"
-                @click.prevent="handleNavClick('/tools/image-recognition', $event)"
-              >
-                <i class="fas fa-eye w-5 h-5 flex items-center justify-center mr-2"></i>
-                <span>图片识别</span>
-              </a>
-              <a 
                 href="/tools/digital-human" 
                 class="text-gray-400 hover:text-white block py-2 flex items-center"
                 :class="{'text-primary': currentPath === '/tools/digital-human'}"
@@ -231,7 +213,7 @@
             >
               <div class="flex items-center">
                 <i class="fas fa-star w-6 h-6 flex items-center justify-center"></i>
-                <span class="ml-3">观星阁</span>
+                <span class="ml-3">天枢·问道</span>
               </div>
               <i :class="expandedCategories.astrology ? 'fas fa-chevron-down' : 'fas fa-chevron-right'" class="text-xs"></i>
             </div>
@@ -247,15 +229,6 @@
                 <span>命理</span>
               </a>
               <a 
-                href="/astrology/feng-shui" 
-                class="text-gray-400 hover:text-white block py-2 flex items-center"
-                :class="{'text-primary': currentPath === '/astrology/feng-shui'}"
-                @click.prevent="handleNavClick('/astrology/feng-shui', $event)"
-              >
-                <i class="fas fa-compass w-5 h-5 flex items-center justify-center mr-2"></i>
-                <span>风水</span>
-              </a>
-              <a 
                 href="/astrology/divination" 
                 class="text-gray-400 hover:text-white block py-2 flex items-center"
                 :class="{'text-primary': currentPath === '/astrology/divination'}"
@@ -265,6 +238,15 @@
                 <span>卦师</span>
               </a>
               <a 
+                href="/astrology/feng-shui" 
+                class="text-gray-400 hover:text-white block py-2 flex items-center"
+                :class="{'text-primary': currentPath === '/astrology/feng-shui'}"
+                @click.prevent="handleNavClick('/astrology/feng-shui', $event)"
+              >
+                <i class="fas fa-compass w-5 h-5 flex items-center justify-center mr-2"></i>
+                <span>风水</span>
+              </a>
+              <a 
                 href="/astrology/ziwei-doushu" 
                 class="text-gray-400 hover:text-white block py-2 flex items-center"
                 :class="{'text-primary': currentPath === '/astrology/ziwei-doushu'}"
@@ -272,15 +254,6 @@
               >
                 <i class="fas fa-dice w-5 h-5 flex items-center justify-center mr-2"></i>
                 <span>斗数</span>
-              </a>
-              <a 
-                href="/astrology/tianji" 
-                class="text-gray-400 hover:text-white block py-2 flex items-center"
-                :class="{'text-primary': currentPath === '/astrology/tianji'}"
-                @click.prevent="handleNavClick('/astrology/tianji', $event)"
-              >
-                <i class="fas fa-cloud w-5 h-5 flex items-center justify-center mr-2"></i>
-                <span>天机</span>
               </a>
             </div>
           </div>
